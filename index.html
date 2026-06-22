@@ -6,10 +6,9 @@
   <title>投資理財 Dashboard</title>
   <style>
     :root {
-      --bg: #f6f8f7;
+      --bg: #f5f7f8;
       --ink: #17212b;
       --muted: #66727f;
-      --subtle: #eef2f3;
       --line: #dbe3e5;
       --surface: #ffffff;
       --surface-2: #f9fbfb;
@@ -58,14 +57,13 @@
     .donut-label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; z-index: 1; }
     .donut-label strong { font-size: 26px; }
     .donut-label small { color: var(--muted); }
-    .legend { display: grid; gap: 10px; }
+    .legend, .bar-list, .rank-list, .insights { display: grid; gap: 12px; }
     .legend-row { display: grid; grid-template-columns: 14px minmax(90px, 1fr) auto auto; gap: 10px; align-items: center; font-size: 13px; }
     .dot { width: 10px; height: 10px; border-radius: 99px; background: var(--color); }
-    .bar-list, .rank-list, .insights { display: grid; gap: 12px; }
     .bar-row { display: grid; grid-template-columns: minmax(120px, 180px) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: 13px; }
     .bar-label strong { display: block; line-height: 1.35; }
     .bar-label small, .bar-value small { color: var(--muted); display: block; line-height: 1.45; }
-    .track { height: 12px; border-radius: 999px; background: var(--subtle); overflow: hidden; }
+    .track { height: 12px; border-radius: 999px; background: #eef2f3; overflow: hidden; }
     .fill { height: 100%; min-width: 2px; border-radius: inherit; background: var(--color); }
     .bar-value { text-align: right; white-space: nowrap; }
     .rank-row { display: grid; grid-template-columns: minmax(130px, 1fr) auto; gap: 12px; align-items: start; padding: 12px 0; border-bottom: 1px solid var(--line); }
@@ -87,7 +85,7 @@
     .table-wrap { max-height: 560px; overflow: auto; }
     .name-cell strong { display: block; line-height: 1.35; }
     .name-cell small { color: var(--muted); }
-    .status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 999px; background: var(--subtle); color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 999px; background: #eef2f3; color: var(--muted); font-size: 12px; white-space: nowrap; }
     .status.held { background: #e6f3ec; color: #17603f; }
     footer { color: var(--muted); font-size: 12px; line-height: 1.7; padding: 8px 2px 0; }
     @media (max-width: 1100px) {
@@ -114,56 +112,56 @@
     <header>
       <div>
         <h1>投資理財 Dashboard</h1>
-        <p class="subtitle">依據 Notion「台股庫存」最新欄位重新製作，資料基準日 2026-06-18。頁面保留持有部位與觀察標的，並用目前股價、持有股數與成本均價重新計算市值、損益、報酬率與配置。</p>
+        <p class="subtitle">同步 Notion「台股庫存」最新資料，持股與觀察清單分開呈現。00403A 主動統一升級50、00993A 主動安聯台灣已依最新資料列為 0 股；6770 與 2605 未出現在本次有效清單中。</p>
       </div>
-      <div class="meta" aria-label="資料來源">
-        <span class="pill">來源：Notion 台股庫存</span>
-        <span class="pill">更新：2026-06-18 14:38 台北時間</span>
+      <div class="meta" aria-label="資料狀態">
+        <span class="pill">資料來源：Notion 台股庫存</span>
+        <span class="pill">更新時間：2026-06-22 14:39 台北時間</span>
       </div>
     </header>
 
-    <section class="kpis" aria-label="投資關鍵指標">
-      <div class="metric" id="valueMetric"><span>目前總市值</span><strong id="totalValue">--</strong><small id="activeCount">--</small></div>
+    <section class="kpis" aria-label="投資組合摘要">
+      <div class="metric"><span>持股總市值</span><strong id="totalValue">--</strong><small id="activeCount">--</small></div>
       <div class="metric" id="gainMetric"><span>未實現損益</span><strong id="totalGain">--</strong><small id="totalReturn">--</small></div>
-      <div class="metric"><span>投入成本</span><strong id="totalCost">--</strong><small>以持有股數乘成本均價估算</small></div>
-      <div class="metric"><span>最大持股</span><strong id="largestHolding">--</strong><small id="largestWeight">--</small></div>
+      <div class="metric"><span>投入成本</span><strong id="totalCost">--</strong><small>僅計入目前持有股數大於 0 的標的</small></div>
+      <div class="metric"><span>最大持倉</span><strong id="largestHolding">--</strong><small id="largestWeight">--</small></div>
       <div class="metric"><span>追蹤標的</span><strong id="trackedCount">--</strong><small id="freshness">--</small></div>
     </section>
 
     <section class="grid two">
       <article class="panel">
-        <div class="panel-head"><h2>資產配置總覽</h2><span>持有部位依資產類型分組，直接看資金集中程度</span></div>
+        <div class="panel-head"><h2>資產配置</h2><span>依目前仍持有的標的計算</span></div>
         <div class="panel-body allocation">
           <div class="donut" id="assetDonut"><div class="donut-label"><strong id="donutReturn">--</strong><small>整體報酬率</small></div></div>
           <div class="legend" id="assetLegend"></div>
         </div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>投資解讀</h2><span>從最新庫存數字自動整理</span></div>
+        <div class="panel-head"><h2>重點觀察</h2><span>由最新持股資料自動整理</span></div>
         <div class="panel-body insights" id="insights"></div>
       </article>
     </section>
 
     <section class="grid three">
       <article class="panel">
-        <div class="panel-head"><h2>持股市值排序</h2><span>每個部位對總資產的貢獻</span></div>
+        <div class="panel-head"><h2>持倉市值排行</h2><span>看出資金集中位置</span></div>
         <div class="panel-body bar-list" id="valueBars"></div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>損益貢獻排行</h2><span>看哪些標的正在拉動或拖累績效</span></div>
+        <div class="panel-head"><h2>損益排行</h2><span>依未實現損益排序</span></div>
         <div class="panel-body rank-list" id="profitRank"></div>
       </article>
       <article class="panel">
-        <div class="panel-head"><h2>產業配置</h2><span>持有部位依產業與 ETF 類型拆解</span></div>
+        <div class="panel-head"><h2>產業分布</h2><span>僅統計仍持有標的</span></div>
         <div class="panel-body bar-list" id="sectorBars"></div>
       </article>
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h2>標的明細</h2><span>可依持股狀態、類別、產業與關鍵字篩選</span></div>
+      <div class="panel-head"><h2>庫存明細</h2><span>可篩選持有、觀察與產業類別</span></div>
       <div class="tabs" id="tabs"></div>
       <div class="toolbar">
-        <input class="search" id="searchInput" type="search" placeholder="搜尋名稱或代號">
+        <input class="search" id="searchInput" type="search" placeholder="搜尋名稱或股票代號">
         <select id="sortBy" aria-label="排序">
           <option value="value">市值高到低</option>
           <option value="gain">損益高到低</option>
@@ -183,15 +181,14 @@
       </div>
     </section>
 
-    <footer>本頁是可離線開啟的靜態 HTML Dashboard，資料由 Notion「台股庫存」於 2026-06-18 14:38 台北時間 讀取後重新製作。Notion 公式欄位未直接展開，因此本頁用持有股數、成本均價與目前股價重新計算主要分析值。產生時間：2026-06-18T06:48:00+00:00。</footer>
+    <footer>本頁由本機產生器依 Notion 最新資料重建，產生時間：2026-06-22T07:02:43+00:00。</footer>
   </div>
 
-  <script id="dashboard-data" type="application/json">{"updatedAt":"2026-06-18T06:38:45.194Z","updatedLabel":"2026-06-18 14:38 台北時間","source":"Notion 台股庫存","holdings":[{"name":"主動統一台股增長","code":"00981A","sector":"主動型ETF","shares":9000,"cost":29.51,"price":31.5,"edited":"2026-06-18T06:38:08.599Z"},{"name":"元大台灣50","code":"0050","sector":"指數型ETF","shares":3000,"cost":100.99,"price":107.3,"edited":"2026-06-18T06:38:06.645Z"},{"name":"台積電","code":"2330","sector":"半導體","shares":61,"cost":1964.84,"price":2410,"edited":"2026-06-18T06:37:58.685Z"},{"name":"凱基台灣TOP50","code":"009816","sector":"指數型ETF","shares":21000,"cost":14.75,"price":15.68,"edited":"2026-06-18T06:38:15.305Z"},{"name":"主動統一升級50","code":"00403A","sector":"主動型ETF","shares":0,"cost":0,"price":11.03,"edited":"2026-06-18T06:38:37.052Z"},{"name":"主動安聯台灣","code":"00993A","sector":"主動型ETF","shares":0,"cost":0,"price":14.29,"edited":"2026-06-18T06:38:35.568Z"},{"name":"主動復華未來50","code":"00991A","sector":"主動型ETF","shares":13000,"cost":18.42,"price":20.68,"edited":"2026-06-18T06:38:45.194Z"},{"name":"主動野村臺灣高息","code":"00999A","sector":"主動型ETF","shares":0,"cost":0,"price":11.31,"edited":"2026-06-18T06:38:33.880Z"},{"name":"主動統一全球創新","code":"00988A","sector":"主動型ETF","shares":9000,"cost":19.84,"price":22.96,"edited":"2026-06-18T06:38:38.545Z"},{"name":"主動群益台灣強棒","code":"00982A","sector":"主動型ETF","shares":0,"cost":0,"price":24.83,"edited":"2026-06-18T06:38:17.142Z"},{"name":"主動群益科技創新","code":"00992A","sector":"主動型ETF","shares":0,"cost":0,"price":18.98,"edited":"2026-06-18T06:38:10.437Z"},{"name":"富邦台50","code":"006208","sector":"指數型ETF","shares":0,"cost":0,"price":249.1,"edited":"2026-06-18T06:38:40.006Z"},{"name":"富邦旗艦50","code":"009802","sector":"指數型ETF","shares":0,"cost":0,"price":19.89,"edited":"2026-06-18T06:38:19.214Z"},{"name":"元大台灣50正2","code":"00631L","sector":"槓桿型ETF","shares":0,"cost":0,"price":38.33,"edited":"2026-06-18T06:38:12.036Z"},{"name":"元大台灣50反1","code":"00632R","sector":"槓桿型ETF","shares":0,"cost":0,"price":10.03,"edited":"2026-06-18T06:38:13.373Z"},{"name":"聯發科","code":"2454","sector":"半導體","shares":0,"cost":0,"price":4390,"edited":"2026-06-18T06:38:01.605Z"},{"name":"日月光投控","code":"3711","sector":"半導體","shares":0,"cost":0,"price":613,"edited":"2026-06-18T06:38:41.887Z"},{"name":"台達電","code":"2308","sector":"電子零組件","shares":0,"cost":0,"price":2150,"edited":"2026-06-18T05:39:05.112Z"},{"name":"鴻海","code":"2317","sector":"電子代工","shares":0,"cost":0,"price":268.5,"edited":"2026-06-18T06:38:00.148Z"},{"name":"廣達","code":"2382","sector":"電子代工","shares":0,"cost":0,"price":376,"edited":"2026-06-18T06:38:03.158Z"},{"name":"智邦","code":"2345","sector":"網絡通信","shares":0,"cost":0,"price":2435,"edited":"2026-06-18T06:38:24.339Z"},{"name":"友達","code":"2409","sector":"光電","shares":0,"cost":0,"price":28.15,"edited":"2026-06-18T06:38:04.577Z"},{"name":"華邦電","code":"2344","sector":"記憶體","shares":0,"cost":0,"price":218.5,"edited":"2026-06-18T06:38:20.545Z"},{"name":"南亞科","code":"2408","sector":"記憶體","shares":0,"cost":0,"price":459.5,"edited":"2026-06-18T06:38:22.106Z"},{"name":"長榮","code":"2603","sector":"航運","shares":0,"cost":0,"price":193,"edited":"2026-06-18T06:38:28.580Z"},{"name":"萬海","code":"2615","sector":"航運","shares":0,"cost":0,"price":80.4,"edited":"2026-06-18T06:38:29.980Z"},{"name":"陽明","code":"2609","sector":"航運","shares":0,"cost":0,"price":51.3,"edited":"2026-06-18T06:38:31.324Z"},{"name":"聯邦銀","code":"2838","sector":"金融","shares":0,"cost":0,"price":22.75,"edited":"2026-06-18T05:38:45.986Z"}]}</script>
+  <script id="dashboard-data" type="application/json">{"updatedAt":"2026-06-22T06:39:00.288Z","updatedLabel":"2026-06-22 14:39 台北時間","source":"Notion 台股庫存","holdings":[{"name":"主動統一台股增長","code":"00981A","sector":"主動型ETF","shares":9000,"cost":29.51,"price":32.23,"edited":"2026-06-22T06:38:09.058Z"},{"name":"元大台灣50","code":"0050","sector":"指數型ETF","shares":3000,"cost":100.99,"price":111.15,"edited":"2026-06-22T06:38:06.672Z"},{"name":"台積電","code":"2330","sector":"半導體","shares":61,"cost":1964.84,"price":2510,"edited":"2026-06-22T06:37:59.040Z"},{"name":"凱基台灣TOP50","code":"009816","sector":"指數型ETF","shares":21000,"cost":14.75,"price":16.17,"edited":"2026-06-22T06:38:15.362Z"},{"name":"主動統一升級50","code":"00403A","sector":"主動型ETF","shares":0,"cost":0,"price":11.38,"edited":"2026-06-22T06:38:40.336Z"},{"name":"主動安聯台灣","code":"00993A","sector":"主動型ETF","shares":0,"cost":0,"price":14.64,"edited":"2026-06-22T06:38:34.567Z"},{"name":"主動復華未來50","code":"00991A","sector":"主動型ETF","shares":13000,"cost":18.42,"price":21.33,"edited":"2026-06-22T06:39:00.288Z"},{"name":"主動野村臺灣高息","code":"00999A","sector":"主動型ETF","shares":0,"cost":0,"price":11.43,"edited":"2026-06-22T06:38:32.752Z"},{"name":"主動統一全球創新","code":"00988A","sector":"主動型ETF","shares":9000,"cost":19.84,"price":23.73,"edited":"2026-06-22T06:38:41.885Z"},{"name":"主動群益台灣強棒","code":"00982A","sector":"主動型ETF","shares":0,"cost":0,"price":25.45,"edited":"2026-06-22T06:38:16.976Z"},{"name":"主動群益科技創新","code":"00992A","sector":"主動型ETF","shares":0,"cost":0,"price":19.42,"edited":"2026-06-22T06:38:10.979Z"},{"name":"富邦台50","code":"006208","sector":"指數型ETF","shares":0,"cost":0,"price":257.45,"edited":"2026-06-22T06:38:43.058Z"},{"name":"富邦旗艦50","code":"009802","sector":"指數型ETF","shares":0,"cost":0,"price":20.16,"edited":"2026-06-22T06:38:18.132Z"},{"name":"元大台灣50正2","code":"00631L","sector":"槓桿型ETF","shares":0,"cost":0,"price":41.32,"edited":"2026-06-22T06:38:12.379Z"},{"name":"元大台灣50反1","code":"00632R","sector":"槓桿型ETF","shares":0,"cost":0,"price":9.65,"edited":"2026-06-22T06:38:13.752Z"},{"name":"聯發科","code":"2454","sector":"半導體","shares":0,"cost":0,"price":4465,"edited":"2026-06-22T06:38:02.130Z"},{"name":"日月光投控","code":"3711","sector":"半導體","shares":0,"cost":0,"price":674,"edited":"2026-06-22T06:38:55.999Z"},{"name":"台達電","code":"2308","sector":"電子零組件","shares":0,"cost":0,"price":2150,"edited":"2026-06-22T06:38:57.932Z"},{"name":"鴻海","code":"2317","sector":"電子代工","shares":0,"cost":0,"price":268.5,"edited":"2026-06-22T06:38:00.733Z"},{"name":"廣達","code":"2382","sector":"電子代工","shares":0,"cost":0,"price":380,"edited":"2026-06-22T06:38:03.761Z"},{"name":"智邦","code":"2345","sector":"網絡通信","shares":0,"cost":0,"price":2595,"edited":"2026-06-22T06:38:24.177Z"},{"name":"友達","code":"2409","sector":"光電","shares":0,"cost":0,"price":30.95,"edited":"2026-06-22T06:38:04.935Z"},{"name":"華邦電","code":"2344","sector":"記憶體","shares":0,"cost":0,"price":222,"edited":"2026-06-22T06:38:20.065Z"},{"name":"南亞科","code":"2408","sector":"記憶體","shares":0,"cost":0,"price":505,"edited":"2026-06-22T06:38:22.132Z"},{"name":"長榮","code":"2603","sector":"航運","shares":0,"cost":0,"price":193,"edited":"2026-06-22T06:38:27.658Z"},{"name":"萬海","code":"2615","sector":"航運","shares":0,"cost":0,"price":80.5,"edited":"2026-06-22T06:38:29.164Z"},{"name":"陽明","code":"2609","sector":"航運","shares":0,"cost":0,"price":52.3,"edited":"2026-06-22T06:38:30.360Z"},{"name":"聯邦銀","code":"2838","sector":"金融","shares":0,"cost":0,"price":22.4,"edited":"2026-06-22T06:38:25.772Z"}]}</script>
   <script>
     const data = JSON.parse(document.getElementById("dashboard-data").textContent);
     const holdings = data.holdings;
     const colors = ["#225ea8", "#0f766e", "#b7791f", "#6d5bd0", "#117a9b", "#228b5f", "#b42318", "#5f6b7a"];
-    const assetOf = item => item.sector.includes("ETF") ? item.sector : "個股";
     const valueOf = item => item.shares * item.price;
     const costOf = item => item.shares * item.cost;
     const gainOf = item => valueOf(item) - costOf(item);
@@ -219,20 +216,20 @@
 
     function hydrateKpis() {
       document.getElementById("totalValue").textContent = fmtMoney(totalValue);
-      document.getElementById("activeCount").textContent = `${active.length} 個有持股，平均每檔 ${fmtMoney(totalValue / Math.max(active.length, 1))}`;
+      document.getElementById("activeCount").textContent = `${active.length} 檔持有，平均市值 ${fmtMoney(totalValue / Math.max(active.length, 1))}`;
       document.getElementById("totalGain").textContent = fmtMoney(totalGain);
       document.getElementById("totalReturn").textContent = `整體報酬率 ${fmtPct(totalReturn)}`;
       document.getElementById("totalCost").textContent = fmtMoney(totalCost);
       document.getElementById("largestHolding").textContent = largest ? largest.name : "--";
-      document.getElementById("largestWeight").textContent = largest ? `佔總市值 ${fmtPct(valueOf(largest) / totalValue)}` : "--";
+      document.getElementById("largestWeight").textContent = largest ? `佔組合 ${fmtPct(valueOf(largest) / totalValue)}` : "--";
       document.getElementById("trackedCount").textContent = `${holdings.length} 檔`;
-      document.getElementById("freshness").textContent = `未持有觀察 ${inactive.length} 檔`;
+      document.getElementById("freshness").textContent = `觀察/已出清 ${inactive.length} 檔，${data.updatedLabel}`;
       document.getElementById("gainMetric").classList.toggle("positive", totalGain >= 0);
       document.getElementById("gainMetric").classList.toggle("negative", totalGain < 0);
     }
 
     function renderAllocation() {
-      const entries = Object.entries(groupedBy(active, assetOf)).map(([name, value], index) => ({
+      const entries = Object.entries(groupedBy(active, item => item.sector)).map(([name, value], index) => ({
         name, value, pct: totalValue ? value / totalValue : 0, color: colors[index % colors.length]
       })).sort((a, b) => b.value - a.value);
       let angle = 0;
@@ -291,19 +288,19 @@
       const topSector = Object.entries(groupedBy(active, item => item.sector)).sort((a, b) => b[1] - a[1])[0];
       const topThreeWeight = [...active].sort((a, b) => valueOf(b) - valueOf(a)).slice(0, 3).reduce((sum, item) => sum + valueOf(item), 0) / totalValue;
       const rows = [
-        ["最大部位", `${largest.name} 目前市值 ${fmtMoney(valueOf(largest))}，佔整體 ${fmtPct(valueOf(largest) / totalValue)}。`],
-        ["最佳報酬", `${best.name} 報酬率 ${fmtPct(returnOf(best))}，未實現損益 ${fmtMoney(gainOf(best))}。`],
-        ["風險集中", `前三大持股合計 ${fmtPct(topThreeWeight)}；最大產業為 ${topSector[0]}，市值 ${fmtMoney(topSector[1])}。`],
-        ["需要留意", `${weakest.name} 目前報酬率 ${fmtPct(returnOf(weakest))}，可作為下次調整時的檢視點。`],
-        ["資料狀態", `共 ${holdings.length} 個標的，${active.length} 個有持股，最後同步 ${data.updatedLabel}。`]
+        ["最大持倉", `${largest.name} 市值 ${fmtMoney(valueOf(largest))}，佔組合 ${fmtPct(valueOf(largest) / totalValue)}。`],
+        ["最高報酬", `${best.name} 報酬率 ${fmtPct(returnOf(best))}，未實現損益 ${fmtMoney(gainOf(best))}。`],
+        ["集中度", `前三大持倉合計 ${fmtPct(topThreeWeight)}，最大產業為 ${topSector[0]}，市值 ${fmtMoney(topSector[1])}。`],
+        ["已出清確認", `00403A、00993A 目前皆為 0 股；00999A 已納入追蹤但未列入持倉總額。`],
+        ["資料狀態", `共 ${holdings.length} 檔追蹤，其中 ${active.length} 檔仍持有，更新時間 ${data.updatedLabel}。`]
       ];
       document.getElementById("insights").innerHTML = rows.map(([title, body]) => `<div class="insight"><strong>${title}</strong><p>${body}</p></div>`).join("");
     }
 
     function buildTabs() {
       const sectors = [...new Set(holdings.map(item => item.sector))];
-      const tabs = ["全部", "有持股", "未持有", "個股", "ETF", ...sectors];
-      document.getElementById("tabs").innerHTML = [...new Set(tabs)].map((tab, index) => `<button class="tab ${index === 0 ? "active" : ""}" type="button" data-filter="${tab}">${tab}</button>`).join("");
+      const tabs = ["全部", "持有", "觀察/已出清", ...sectors];
+      document.getElementById("tabs").innerHTML = tabs.map((tab, index) => `<button class="tab ${index === 0 ? "active" : ""}" type="button" data-filter="${tab}">${tab}</button>`).join("");
     }
 
     function filterRows() {
@@ -311,10 +308,8 @@
       return holdings.filter(item => {
         const matchesFilter =
           currentFilter === "全部" ||
-          (currentFilter === "有持股" && item.shares > 0) ||
-          (currentFilter === "未持有" && item.shares === 0) ||
-          (currentFilter === "個股" && !item.sector.includes("ETF")) ||
-          (currentFilter === "ETF" && item.sector.includes("ETF")) ||
+          (currentFilter === "持有" && item.shares > 0) ||
+          (currentFilter === "觀察/已出清" && item.shares === 0) ||
           item.sector === currentFilter;
         const matchesSearch = !query || item.name.toLowerCase().includes(query) || item.code.toLowerCase().includes(query);
         return matchesFilter && matchesSearch;
@@ -342,7 +337,7 @@
         return `<tr>
           <td class="name-cell"><strong>${item.name}</strong><small>${item.code}</small></td>
           <td>${item.sector}</td>
-          <td><span class="status ${held ? "held" : ""}">${held ? "有持股" : "觀察"}</span></td>
+          <td><span class="status ${held ? "held" : ""}">${held ? "持有" : "觀察/已出清"}</span></td>
           <td>${fmtNum(item.shares)}</td>
           <td>${held ? fmtPrice(item.cost) : "--"}</td>
           <td>${fmtPrice(item.price)}</td>
