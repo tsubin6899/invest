@@ -590,7 +590,7 @@
       const codes = [...new Set(["0050", "00981A", "VOO", "QQQ", ...data.dca.flatMap(row => Object.keys(row).filter(key => key !== "month"))])];
       return `${section("dca", "定期定額追蹤", "", `<button class="btn purple small" data-add="dca">+ 新增月份紀錄</button>`)}
         <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="setting-grid">${codes.map(c => settingTile(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
-        <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td><input type="checkbox" ${r[c] ? "checked" : ""} data-path="dca.${i}.${c}"></td>`).join("")}<td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+        <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>月扣合計</th><th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td>${textInput(typeof r[c] === "boolean" ? (r[c] ? Number(data.rates[`dca_${c}`]) || 1 : 0) : Number(r[c]) || 0, `dca.${i}.${c}`, "number")}</td>`).join("")}<td>${money(codes.reduce((total, c) => total + (typeof r[c] === "boolean" ? (r[c] ? Number(data.rates[`dca_${c}`]) || 1 : 0) : Number(r[c]) || 0), 0))}</td><td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
     }
     function purchaseCost(row) {
       const gross = (Number(row.shares) || 0) * (Number(row.price) || 0);
@@ -784,7 +784,7 @@
         gold: { date: "2026-07-06", item: "新黃金", tael: 0, mace: 0, candareen: 0, li: 0, gram: 0, gold: 0, labor: 0, place: "" },
         silver: { date: "2026-07-06", item: "新白銀", qty: 0, oz: 1, cost: 0, note: "" },
         funds: { name: "新基金", units: 0, cost: 0, nav: 0 },
-        dca: { month: "2026.08", "0050": false, "00981A": false, VOO: false, QQQ: false },
+        dca: { month: "2026.08", "0050": Number(data.rates.dca_0050) || 0, "00981A": Number(data.rates.dca_00981A) || 0, VOO: Number(data.rates.dca_VOO) || 0, QQQ: Number(data.rates.dca_QQQ) || 0 },
         purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
         pnlCalendar: makeTodaySnapshot(),
