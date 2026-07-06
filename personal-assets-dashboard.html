@@ -1,0 +1,736 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>個人資產儀表板｜阿斌Tsubin</title>
+  <style>
+    :root {
+      --bg: #f4f8fb;
+      --panel: #ffffff;
+      --panel-2: #f6f8fb;
+      --ink: #142033;
+      --muted: #667485;
+      --line: #dfe6ee;
+      --navy: #101c34;
+      --blue: #2368d8;
+      --green: #24b370;
+      --purple: #8b3fb6;
+      --amber: #d99213;
+      --red: #c64b4b;
+      --teal: #207f86;
+      --shadow: 0 14px 34px rgba(21, 32, 49, .08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    .shell {
+      width: min(1500px, calc(100vw - 34px));
+      margin: 12px auto 32px;
+      padding: 24px 28px 28px;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      background: rgba(255,255,255,.82);
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      min-height: 130px;
+      padding: 30px 28px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: linear-gradient(90deg, #dfeeff 0%, #f8fbff 48%, #fff 100%);
+    }
+    h1, h2, h3, p { margin: 0; }
+    h1 { font-size: 34px; line-height: 1.18; letter-spacing: 0; }
+    .sub { margin-top: 10px; color: var(--muted); font-size: 14px; }
+    .actions, .tabs, .toolbox {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .actions {
+      justify-content: flex-end;
+      min-height: 64px;
+      margin: 20px 0;
+      padding: 12px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fbfcfe;
+    }
+    .btn {
+      min-height: 38px;
+      border: 0;
+      border-radius: 999px;
+      padding: 8px 17px;
+      color: #fff;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .btn.purple { background: var(--purple); }
+    .btn.green { background: var(--green); }
+    .btn.blue { background: var(--blue); }
+    .btn.dark { background: var(--navy); }
+    .btn.small { min-height: 32px; padding: 6px 12px; font-size: 13px; }
+    .icon-btn {
+      width: 34px;
+      height: 34px;
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      background: #fff;
+      color: var(--muted);
+    }
+    .tabs {
+      margin-bottom: 46px;
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: #f3f6fa;
+      box-shadow: inset 0 0 0 1px rgba(223,230,238,.6);
+    }
+    .tab {
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      color: #263245;
+      min-height: 36px;
+      padding: 8px 14px;
+      font-weight: 700;
+    }
+    .tab.active { background: var(--navy); color: #fff; }
+    .view { display: none; }
+    .view.active { display: block; }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+    .section-head h2 { font-size: 28px; letter-spacing: 0; }
+    .section-note { margin-top: 8px; color: var(--muted); font-size: 14px; }
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .card, .panel {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel);
+      box-shadow: 0 10px 26px rgba(21,32,49,.05);
+    }
+    .card {
+      min-height: 132px;
+      padding: 22px 20px;
+    }
+    .card.dark { background: linear-gradient(135deg, #101c34, #1d3a82); color: #fff; }
+    .card.accent { background: #eef6ff; border-color: #7bb4be; }
+    .label { color: var(--muted); font-size: 14px; }
+    .dark .label { color: rgba(255,255,255,.78); }
+    .number {
+      display: block;
+      margin-top: 8px;
+      font-size: 34px;
+      line-height: 1.1;
+      font-weight: 800;
+      letter-spacing: 0;
+    }
+    .unit { color: var(--muted); font-size: 13px; }
+    .gain { color: var(--red); }
+    .ok { color: var(--green); }
+    .amber { color: var(--amber); }
+    .panel { overflow: hidden; margin-top: 16px; }
+    .panel-pad { padding: 18px; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 920px; font-size: 14px; }
+    th, td {
+      border-bottom: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+      padding: 12px 12px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    th:last-child, td:last-child { border-right: 0; }
+    th { background: #f3f6fa; color: #334155; font-weight: 700; }
+    tr:last-child td { border-bottom: 0; }
+    input, select {
+      min-height: 34px;
+      border: 1px solid #cfd8e3;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 7px 9px;
+      max-width: 100%;
+    }
+    input[type="number"] { width: 118px; }
+    input[type="checkbox"] {
+      width: 32px;
+      height: 32px;
+      accent-color: var(--green);
+    }
+    .toolbar {
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #fbfcfe;
+    }
+    .search { min-width: 250px; }
+    .gold-summary {
+      padding: 22px 18px;
+      line-height: 2.15;
+      font-size: 16px;
+    }
+    .gold-summary strong {
+      color: var(--amber);
+      font-size: 34px;
+      margin: 0 8px;
+    }
+    .muted { color: var(--muted); }
+    .split {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+    .asset-grid {
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+      gap: 22px;
+      align-items: center;
+    }
+    .donut {
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: conic-gradient(var(--blue) 0 var(--tw), var(--green) var(--tw) var(--us), var(--amber) var(--us) var(--cash), var(--purple) var(--cash) 360deg);
+      position: relative;
+      margin: auto;
+    }
+    .donut:after {
+      content: "";
+      position: absolute;
+      inset: 54px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid var(--line);
+    }
+    .donut-text {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-content: center;
+      z-index: 1;
+      text-align: center;
+    }
+    .legend { display: grid; gap: 12px; }
+    .legend-row {
+      display: grid;
+      grid-template-columns: 12px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+    .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--c); }
+    .notice {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border: 1px dashed #cfd8e3;
+      border-radius: 12px;
+      color: var(--muted);
+      background: #fbfcfe;
+      line-height: 1.7;
+    }
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(120px, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .day-card {
+      min-height: 116px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+      display: grid;
+      align-content: start;
+      gap: 7px;
+    }
+    .day-card.empty {
+      background: #f8fafc;
+      border-style: dashed;
+    }
+    .day-card strong { font-size: 15px; }
+    .day-card .delta { font-size: 18px; font-weight: 800; }
+    .day-card small { color: var(--muted); line-height: 1.45; }
+    @media (max-width: 1100px) {
+      .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .asset-grid, .split { grid-template-columns: 1fr; }
+      .calendar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .tabs { margin-bottom: 28px; }
+    }
+    @media (max-width: 720px) {
+      .shell { width: 100%; margin: 0; border-radius: 0; padding: 16px; }
+      h1 { font-size: 27px; }
+      .section-head { align-items: flex-start; flex-direction: column; }
+      .cards { grid-template-columns: 1fr; }
+      .calendar-grid { grid-template-columns: 1fr; }
+      .actions { justify-content: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <h1>個人資產儀表板｜阿斌Tsubin</h1>
+      <p class="sub">本檔案使用本機瀏覽器儲存資料，可管理台股、美股、現金、貴金屬、定期投入與支出規畫。</p>
+    </section>
+
+    <section class="actions" aria-label="工具列">
+      <button class="btn purple" id="exportCsv">匯出報表 (CSV)</button>
+      <button class="btn blue" id="exportSymbols">匯出代碼清單</button>
+      <button class="btn green" id="importPrices">套用最新股價</button>
+      <button class="btn green" id="saveData">匯入存檔</button>
+      <button class="btn blue" id="exportJson">匯出存檔 (JSON)</button>
+      <button class="btn dark" id="resetData">設定</button>
+      <input type="file" id="importJson" accept="application/json" hidden>
+      <input type="file" id="priceJson" accept="application/json" hidden>
+    </section>
+
+    <nav class="tabs" id="tabs" aria-label="資產分類"></nav>
+
+    <section class="view active" id="overview"></section>
+    <section class="view" id="tw"></section>
+    <section class="view" id="us"></section>
+    <section class="view" id="cash"></section>
+    <section class="view" id="gold"></section>
+    <section class="view" id="silver"></section>
+    <section class="view" id="fund"></section>
+    <section class="view" id="dca"></section>
+    <section class="view" id="expense"></section>
+    <section class="view" id="allocation"></section>
+    <section class="view" id="chart"></section>
+  </main>
+
+  <script>
+    const storageKey = "personal-assets-dashboard-tsubin-v2";
+    const tabs = [
+      ["overview", "總覽儀表板"], ["tw", "台股部位"], ["us", "美股部位"], ["cash", "現金帳戶"],
+      ["gold", "實體黃金"], ["silver", "實體白銀"], ["fund", "台幣基金"], ["dca", "定期投入"],
+      ["expense", "支出規畫"], ["allocation", "額外資金分配"],
+      ["chart", "資訊圖表庫"]
+    ];
+    const seed = {
+      rates: { usd: 31.8, goldGram: 2980, silverOz: 1850 },
+      tw: [],
+      us: [],
+      cash: [],
+      cards: [],
+      gold: [],
+      silver: [],
+      funds: [],
+      dca: [],
+      budget: [],
+      pnlCalendar: [],
+      allocation: []
+    };
+    let data = load();
+    let currentTab = "overview";
+
+    function load() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(storageKey));
+        return saved ? { ...structuredClone(seed), ...saved, rates: { ...seed.rates, ...(saved.rates || {}) } } : structuredClone(seed);
+      }
+      catch { return structuredClone(seed); }
+    }
+    function persist() {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      toast("已存入瀏覽器本機儲存");
+    }
+    function money(n, currency = "TWD") {
+      return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: currency === "USD" ? 2 : 0 }).format(Number(n) || 0);
+    }
+    function sum(rows, fn) { return rows.reduce((t, r) => t + fn(r), 0); }
+    function twdCash(row) { return row.currency === "USD" ? row.amount * data.rates.usd : row.amount; }
+    function stockValue(rows, fx = 1) { return sum(rows, r => r.shares * r.price * fx); }
+    function stockCost(rows, fx = 1) { return sum(rows, r => r.shares * r.cost * fx); }
+    function goldCost() { return sum(data.gold, r => r.gold + r.labor); }
+    function goldGram() { return sum(data.gold, r => r.gram); }
+    function silverCost() { return sum(data.silver, r => r.cost); }
+    function silverOz() { return sum(data.silver, r => r.qty * r.oz); }
+    function allTotals() {
+      const tw = stockValue(data.tw);
+      const us = stockValue(data.us, data.rates.usd);
+      const cash = sum(data.cash, twdCash);
+      const cards = sum(data.cards, r => r.amount);
+      const gold = goldGram() * data.rates.goldGram;
+      const silver = silverOz() * data.rates.silverOz;
+      const fund = sum(data.funds, r => r.units * r.nav);
+      const total = tw + us + cash + gold + silver + fund - cards;
+      const cost = stockCost(data.tw) + stockCost(data.us, data.rates.usd) + goldCost() + silverCost() + sum(data.funds, r => r.cost);
+      return { tw, us, cash, cards, gold, silver, fund, total, cost, gain: total - cost - cards };
+    }
+    function card(label, value, unit, cls = "") {
+      return `<article class="card ${cls}"><span class="label">${label}</span><strong class="number">${value}</strong><span class="unit">${unit}</span></article>`;
+    }
+    function localDateString(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    }
+    function textInput(value, path, type = "text") {
+      return `<input type="${type}" value="${value}" data-path="${path}">`;
+    }
+    function section(id, title, note = "", tools = "") {
+      return `<div class="section-head"><div><h2>${title}</h2>${note ? `<p class="section-note">${note}</p>` : ""}</div>${tools}</div>`;
+    }
+    function renderTabs() {
+      document.getElementById("tabs").innerHTML = tabs.map(([id, label]) => `<button class="tab ${id === currentTab ? "active" : ""}" data-tab="${id}">${label}</button>`).join("");
+    }
+    function renderOverview() {
+      const t = allTotals();
+      const parts = [
+        ["台股", t.tw, "--blue"], ["美股", t.us, "--green"], ["現金", t.cash, "--amber"], ["貴金屬/基金", t.gold + t.silver + t.fund, "--purple"]
+      ];
+      let cursor = 0;
+      const stops = parts.map((p) => {
+        const deg = t.total ? cursor + p[1] / t.total * 360 : cursor;
+        cursor = deg;
+        return `${deg}deg`;
+      });
+      return `
+        ${section("overview", "總覽儀表板", "跨資產總覽與配置比例。")}
+        <div class="cards">
+          ${card("總資產淨值", money(t.total), "TWD", "dark")}
+          ${card("投入成本估算", money(t.cost), "TWD")}
+          ${card("未實現損益", money(t.gain), "TWD", "accent")}
+          ${card("信用卡待繳", `NT$${money(t.cards)}`, "不併入現金統計")}
+        </div>
+        <article class="panel"><div class="panel-pad asset-grid">
+          <div class="donut" style="--tw:${stops[0]};--us:${stops[1]};--cash:${stops[2]};"><div class="donut-text"><strong>${money(t.total)}</strong><span class="muted">淨資產</span></div></div>
+          <div class="legend">${parts.map((p, i) => `<div class="legend-row"><span class="dot" style="--c:var(${p[2]})"></span><strong>${p[0]}</strong><span>${money(p[1])} TWD</span></div>`).join("")}</div>
+        </div></article>
+        ${renderPnlCalendar()}
+      `;
+    }
+    function renderStock(kind, title, currency) {
+      const rows = data[kind];
+      const fx = currency === "USD" ? data.rates.usd : 1;
+      const value = stockValue(rows, fx);
+      const cost = stockCost(rows, fx);
+      const gain = value - cost;
+      return `
+        ${section(kind, `${title}持股總覽`, "", `<button class="btn green small" data-add="${kind}">+ 新增${title}持股</button>`)}
+        <div class="cards">
+          ${card("總投入成本", money(cost, currency), currency)}
+          ${card("當前總現值", money(value, currency), currency)}
+          ${card("未實現損益", money(gain, currency), `${cost ? (gain / cost * 100).toFixed(2) : "0.00"}%`, "accent")}
+        </div>
+        <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select id="${kind}Sort"><option value="code">依代號排序</option><option value="gain">依損益排序</option><option value="value">依市值排序</option></select></div>
+        <article class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>股票代號</th><th>標的名稱</th><th>持股數</th><th>平均成本</th><th>目前市價</th><th>現值</th><th>未實現損益</th><th>報酬率</th><th>操作</th></tr></thead>
+          <tbody>${rows.map((r, i) => {
+            const rowValue = r.shares * r.price;
+            const rowCost = r.shares * r.cost;
+            const rowGain = rowValue - rowCost;
+            return `<tr><td>${textInput(r.code, `${kind}.${i}.code`)}</td><td>${textInput(r.name, `${kind}.${i}.name`)}</td><td>${textInput(r.shares, `${kind}.${i}.shares`, "number")}</td><td>${textInput(r.cost, `${kind}.${i}.cost`, "number")}</td><td>${textInput(r.price, `${kind}.${i}.price`, "number")}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><button class="icon-btn" data-del="${kind}.${i}">刪</button></td></tr>`;
+          }).join("")}</tbody>
+        </table></div></article>
+      `;
+    }
+    function renderCash() {
+      const bank = sum(data.cash, twdCash);
+      const reserved = sum(data.cards, r => r.amount);
+      return `
+        ${section("cash", "現金帳戶", "", `<button class="btn blue small" data-add="cash">+ 新增銀行帳戶</button>`)}
+        <div class="cards">
+          ${card("銀行現金總計", money(bank), "TWD，只計銀行帳戶")}
+          ${card("預備金", textInput(85000, "rates.reserve", "number"), "算入總資產，但不算入銀行現金統計")}
+          ${card("現金類合計", money(bank + 85000), "銀行現金 + 預備金", "dark")}
+          ${card("信用卡待繳總額", `NT$${money(reserved)}`, "提醒用，不併入總資產")}
+        </div>
+        <article class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>銀行名稱</th><th>幣別</th><th>現金餘額</th><th>折台幣</th><th>操作</th></tr></thead>
+          <tbody>${data.cash.map((r, i) => `<tr><td>${textInput(r.bank, `cash.${i}.bank`)}</td><td>${textInput(r.currency, `cash.${i}.currency`)}</td><td>${textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td><button class="icon-btn" data-del="cash.${i}">刪</button></td></tr>`).join("")}</tbody>
+        </table></div></article>
+        <article class="panel"><div class="panel-pad">${section("cards", "信用卡款項紀錄", "只記錄各張卡本期待繳總額。", `<button class="btn green small" data-add="cards">+ 新增信用卡款項</button>`)}
+          <div class="table-wrap"><table><thead><tr><th>信用卡 / 銀行</th><th>本期待繳金額</th><th>繳款期限</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.cards.map((r, i) => `<tr><td>${textInput(r.card, `cards.${i}.card`)}</td><td>${textInput(r.amount, `cards.${i}.amount`, "number")}</td><td>${textInput(r.due, `cards.${i}.due`)}</td><td>${textInput(r.note, `cards.${i}.note`)}</td><td><button class="icon-btn" data-del="cards.${i}">刪</button></td></tr>`).join("")}</tbody></table></div>
+        </div></article>
+      `;
+    }
+    function renderMetals(kind) {
+      const isGold = kind === "gold";
+      const rows = data[kind];
+      const totalWeight = isGold ? goldGram() : silverOz();
+      const cost = isGold ? goldCost() : silverCost();
+      const value = isGold ? totalWeight * data.rates.goldGram : totalWeight * data.rates.silverOz;
+      const title = isGold ? "實體黃金" : "實體白銀";
+      return `
+        ${section(kind, title, isGold ? "金飾、金條、金幣可混合記錄。" : "白銀以 oz 作為主要計量單位。", `<button class="btn green small" data-add="${kind}">+ 新增${isGold ? "黃金" : "白銀"}紀錄</button>`)}
+        <div class="cards">
+          ${card("總庫存重量", isGold ? totalWeight.toFixed(2) : totalWeight.toFixed(2), isGold ? "公克" : "oz")}
+          ${card("投入總成本", money(cost), "TWD")}
+          ${card("目前估算市值", money(value), "TWD")}
+          ${card("未實現損益", money(value - cost), `${cost ? ((value - cost) / cost * 100).toFixed(2) : "0.00"}%`, "accent")}
+        </div>
+        ${isGold ? `<article class="panel gold-summary"><div>總庫存重量：<strong>${Math.floor(totalWeight / 37.5)}</strong>兩 <strong>${Math.floor((totalWeight % 37.5) / 3.75)}</strong>錢 <span class="muted">(${totalWeight.toFixed(2)} 公克)</span></div><div>平均買入金價：<strong>${money(cost / Math.max(totalWeight, 1) * 3.75)}</strong>TWD / 錢</div></article>` : ""}
+        <article class="panel"><div class="table-wrap"><table>
+          <thead><tr>${isGold ? "<th>購買日期</th><th>品項</th><th>兩</th><th>錢</th><th>分</th><th>厘</th><th>公克</th><th>金價</th><th>工錢</th><th>總成本</th><th>購買地點</th><th>操作</th>" : "<th>購買日期</th><th>品項名稱</th><th>數量</th><th>單件重量(oz)</th><th>總重量(oz)</th><th>總購買金額</th><th>備註</th><th>操作</th>"}</tr></thead>
+          <tbody>${rows.map((r, i) => isGold
+            ? `<tr><td>${textInput(r.date, `gold.${i}.date`)}</td><td>${textInput(r.item, `gold.${i}.item`)}</td><td>${textInput(r.tael, `gold.${i}.tael`, "number")}</td><td>${textInput(r.mace, `gold.${i}.mace`, "number")}</td><td>${textInput(r.candareen, `gold.${i}.candareen`, "number")}</td><td>${textInput(r.li, `gold.${i}.li`, "number")}</td><td>${textInput(r.gram, `gold.${i}.gram`, "number")}</td><td>${textInput(r.gold, `gold.${i}.gold`, "number")}</td><td>${textInput(r.labor, `gold.${i}.labor`, "number")}</td><td>${money(r.gold + r.labor)}</td><td>${textInput(r.place, `gold.${i}.place`)}</td><td><button class="icon-btn" data-del="gold.${i}">刪</button></td></tr>`
+            : `<tr><td>${textInput(r.date, `silver.${i}.date`)}</td><td>${textInput(r.item, `silver.${i}.item`)}</td><td>${textInput(r.qty, `silver.${i}.qty`, "number")}</td><td>${textInput(r.oz, `silver.${i}.oz`, "number")}</td><td>${(r.qty * r.oz).toFixed(2)}</td><td>${textInput(r.cost, `silver.${i}.cost`, "number")}</td><td>${textInput(r.note, `silver.${i}.note`)}</td><td><button class="icon-btn" data-del="silver.${i}">刪</button></td></tr>`
+          ).join("")}</tbody>
+        </table></div></article>
+      `;
+    }
+    function renderFund() {
+      const cost = sum(data.funds, r => r.cost);
+      const value = sum(data.funds, r => r.units * r.nav);
+      return `${section("fund", "安聯台灣科技持股總覽", "", `<button class="btn blue small" data-add="funds">+ 補入基金紀錄</button>`)}
+        <article class="panel"><div class="panel-pad">
+          <p>總持有單位：<strong class="number" style="display:inline">${money(sum(data.funds, r => r.units))}</strong>｜總投入金額：<strong class="number" style="display:inline">${money(cost)}</strong> TWD｜目前總現值：<strong class="number amber" style="display:inline">${money(value)}</strong> TWD｜未實現損益：<strong class="number gain" style="display:inline">${money(value - cost)}</strong> TWD</p>
+        </div></article>
+        <article class="panel"><div class="table-wrap"><table><thead><tr><th>基金名稱</th><th>總投入金額</th><th>購入單位數</th><th>目前淨值</th><th>現值</th><th>操作</th></tr></thead><tbody>${data.funds.map((r, i) => `<tr><td>${textInput(r.name, `funds.${i}.name`)}</td><td>${textInput(r.cost, `funds.${i}.cost`, "number")}</td><td>${textInput(r.units, `funds.${i}.units`, "number")}</td><td>${textInput(r.nav, `funds.${i}.nav`, "number")}</td><td>${money(r.units * r.nav)}</td><td><button class="icon-btn" data-del="funds.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+    }
+    function renderDca() {
+      const codes = ["0050", "00981A", "VOO", "QQQ"];
+      return `${section("dca", "定期定額追蹤", "", `<button class="btn purple small" data-add="dca">+ 新增月份紀錄</button>`)}
+        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="cards" style="margin-top:14px">${codes.map(c => card(c, textInput(0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
+        <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td><input type="checkbox" ${r[c] ? "checked" : ""} data-path="dca.${i}.${c}"></td>`).join("")}<td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+    }
+    function currentStockGain() {
+      return {
+        twGain: stockValue(data.tw) - stockCost(data.tw),
+        usGain: stockValue(data.us, data.rates.usd) - stockCost(data.us, data.rates.usd)
+      };
+    }
+    function renderPnlCalendar() {
+      const rows = [...data.pnlCalendar].sort((a, b) => a.date.localeCompare(b.date));
+      const latest = rows.at(-1) || { totalGain: 0 };
+      const previous = rows.at(-2) || { totalGain: latest.totalGain };
+      const delta = latest.totalGain - previous.totalGain;
+      const month = (latest.date || new Date().toISOString().slice(0, 10)).slice(0, 7);
+      const byDate = Object.fromEntries(rows.filter(r => r.date.startsWith(month)).map(r => [r.date, r]));
+      const first = new Date(`${month}-01T00:00:00`);
+      const lastDate = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const blanks = first.getDay();
+      const cells = [];
+      for (let i = 0; i < blanks; i++) cells.push(`<div class="day-card empty"></div>`);
+      for (let day = 1; day <= lastDate; day++) {
+        const date = `${month}-${String(day).padStart(2, "0")}`;
+        const row = byDate[date];
+        const prev = rows.filter(r => r.date < date).at(-1);
+        const dayDelta = row && prev ? row.totalGain - prev.totalGain : 0;
+        cells.push(`<div class="day-card"><strong>${day}</strong>${row ? `<span class="delta ${dayDelta >= 0 ? "ok" : "gain"}">${dayDelta >= 0 ? "+" : ""}${money(dayDelta)}</span><small>未實現損益 ${money(row.totalGain)}<br>${row.note || ""}</small>` : `<small>尚未記錄</small>`}</div>`);
+      }
+      return `${section("pnlCalendar", "股票每日未實現損益變動行事曆", "按一下即可用目前台股與美股持股資料記錄今日未實現損益；若今天已有紀錄會直接更新。", `<button class="btn blue small" data-snapshot-pnl>一鍵記錄今日快照</button>`)}
+        <div class="cards">
+          ${card("最新未實現損益", money(latest.totalGain), "TWD", "accent")}
+          ${card("較前次變動", `${delta >= 0 ? "+" : ""}${money(delta)}`, "TWD")}
+          ${card("台股未實現損益", money(latest.twGain || 0), "TWD")}
+          ${card("美股未實現損益", money(latest.usGain || 0), "TWD")}
+        </div>
+        <article class="panel"><div class="panel-pad"><h3>${month} 損益行事曆</h3><div class="calendar-grid">${cells.join("")}</div></div></article>
+        <article class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>日期</th><th>台股未實現損益</th><th>美股未實現損益</th><th>股票未實現損益合計</th><th>較前筆變動</th><th>備註</th><th>操作</th></tr></thead>
+          <tbody>${rows.map((r) => {
+            const i = data.pnlCalendar.indexOf(r);
+            const prev = rows.filter(item => item.date < r.date).at(-1);
+            const rowDelta = prev ? r.totalGain - prev.totalGain : 0;
+            return `<tr><td>${textInput(r.date, `pnlCalendar.${i}.date`)}</td><td>${textInput(r.twGain, `pnlCalendar.${i}.twGain`, "number")}</td><td>${textInput(r.usGain, `pnlCalendar.${i}.usGain`, "number")}</td><td>${textInput(r.totalGain, `pnlCalendar.${i}.totalGain`, "number")}</td><td class="${rowDelta >= 0 ? "ok" : "gain"}">${rowDelta >= 0 ? "+" : ""}${money(rowDelta)}</td><td>${textInput(r.note, `pnlCalendar.${i}.note`)}</td><td><button class="icon-btn" data-del="pnlCalendar.${i}">刪</button></td></tr>`;
+          }).join("")}</tbody>
+        </table></div></article>`;
+    }
+    function renderGeneric(key, title) {
+      if (key === "expense") {
+        return `${section(key, title, "月支出、年度支出與待處理款項。", `<button class="btn green small" data-add="budget">+ 新增支出</button>`)}
+          <article class="panel"><div class="table-wrap"><table><thead><tr><th>項目</th><th>金額</th><th>週期</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.budget.map((r, i) => `<tr><td>${textInput(r.item, `budget.${i}.item`)}</td><td>${textInput(r.amount, `budget.${i}.amount`, "number")}</td><td>${textInput(r.cycle, `budget.${i}.cycle`)}</td><td>${textInput(r.note, `budget.${i}.note`)}</td><td><button class="icon-btn" data-del="budget.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+      }
+      if (key === "allocation") {
+        return `${section(key, title, "規畫新增資金分配比例。", `<button class="btn green small" data-add="allocation">+ 新增分配項目</button>`)}
+          <article class="panel"><div class="table-wrap"><table><thead><tr><th>目標</th><th>分配比例</th><th>每 100,000 元分配金額</th><th>操作</th></tr></thead><tbody>${data.allocation.map((r, i) => `<tr><td>${textInput(r.target, `allocation.${i}.target`)}</td><td>${textInput(r.ratio, `allocation.${i}.ratio`, "number")}%</td><td>${money(r.ratio * 1000)}</td><td><button class="icon-btn" data-del="allocation.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+      }
+      const t = allTotals();
+      const twRatio = t.total ? (t.tw / t.total * 100).toFixed(1) : "0.0";
+      const usRatio = t.total ? (t.us / t.total * 100).toFixed(1) : "0.0";
+      return `${section(key, title, "此分頁已保留為可擴充工作區。")}
+        <div class="cards">${card("目前淨資產", money(t.total), "TWD", "dark")}${card("可投入現金", money(t.cash - t.cards), "TWD")}${card("台股比重", `${twRatio}%`, "目前配置")}${card("美股比重", `${usRatio}%`, "目前配置")}</div>
+        <div class="notice">可在這裡接上你的 Notion、Google Sheet 或現有 Python 建置流程，將示範資料替換成實際資料。</div>`;
+    }
+    function render() {
+      renderTabs();
+      document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === currentTab));
+      document.getElementById("overview").innerHTML = renderOverview();
+      document.getElementById("tw").innerHTML = renderStock("tw", "台股", "TWD");
+      document.getElementById("us").innerHTML = renderStock("us", "美股", "USD");
+      document.getElementById("cash").innerHTML = renderCash();
+      document.getElementById("gold").innerHTML = renderMetals("gold");
+      document.getElementById("silver").innerHTML = renderMetals("silver");
+      document.getElementById("fund").innerHTML = renderFund();
+      document.getElementById("dca").innerHTML = renderDca();
+      document.getElementById("expense").innerHTML = renderGeneric("expense", "支出規畫");
+      document.getElementById("allocation").innerHTML = renderGeneric("allocation", "額外資金分配");
+      document.getElementById("chart").innerHTML = renderGeneric("chart", "資訊圖表庫");
+      wireInputs();
+    }
+    function setPath(path, value) {
+      const parts = path.split(".");
+      let ref = data;
+      while (parts.length > 1) ref = ref[parts.shift()];
+      ref[parts[0]] = value;
+    }
+    function delPath(path) {
+      const [key, index] = path.split(".");
+      data[key].splice(Number(index), 1);
+      render();
+    }
+    function addRow(key) {
+      const defaults = {
+        tw: { code: "新代號", name: "新台股", shares: 0, cost: 0, price: 0 },
+        us: { code: "NEW", name: "New US Stock", shares: 0, cost: 0, price: 0 },
+        cash: { bank: "新銀行", currency: "TWD", amount: 0 },
+        cards: { card: "新信用卡", amount: 0, due: "2026-07-31", note: "" },
+        gold: { date: "2026-07-06", item: "新黃金", tael: 0, mace: 0, candareen: 0, li: 0, gram: 0, gold: 0, labor: 0, place: "" },
+        silver: { date: "2026-07-06", item: "新白銀", qty: 0, oz: 1, cost: 0, note: "" },
+        funds: { name: "新基金", units: 0, cost: 0, nav: 0 },
+        dca: { month: "2026.08", "0050": false, "00981A": false, VOO: false, QQQ: false },
+        budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
+        pnlCalendar: makeTodaySnapshot(),
+        allocation: { target: "新目標", ratio: 0 }
+      };
+      data[key].push(defaults[key]);
+      render();
+    }
+    function makeTodaySnapshot() {
+      const gain = currentStockGain();
+      return {
+        date: localDateString(),
+        twGain: Math.round(gain.twGain),
+        usGain: Math.round(gain.usGain),
+        totalGain: Math.round(gain.twGain + gain.usGain),
+        note: "一鍵快照：依目前台股與美股持股價格自動記錄"
+      };
+    }
+    function recordTodaySnapshot() {
+      const snapshot = makeTodaySnapshot();
+      const index = data.pnlCalendar.findIndex(row => row.date === snapshot.date);
+      if (index >= 0) {
+        data.pnlCalendar[index] = { ...data.pnlCalendar[index], ...snapshot };
+        toast("已更新今日損益快照");
+      } else {
+        data.pnlCalendar.push(snapshot);
+        toast("已新增今日損益快照");
+      }
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      render();
+    }
+    function wireInputs() {
+      document.querySelectorAll("[data-path]").forEach(el => {
+        el.addEventListener("change", () => {
+          let value = el.type === "checkbox" ? el.checked : el.value;
+          if (el.type === "number") value = Number(value);
+          setPath(el.dataset.path, value);
+          render();
+        });
+      });
+      document.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => delPath(el.dataset.del)));
+      document.querySelectorAll("[data-add]").forEach(el => el.addEventListener("click", () => addRow(el.dataset.add)));
+      document.querySelectorAll("[data-snapshot-pnl]").forEach(el => el.addEventListener("click", recordTodaySnapshot));
+    }
+    function download(name, text, type) {
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([text], { type }));
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    function exportCsv() {
+      const rows = [["分類", "代號/項目", "名稱", "數量", "成本", "現價/金額", "現值"]];
+      data.tw.forEach(r => rows.push(["台股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
+      data.us.forEach(r => rows.push(["美股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
+      data.cash.forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
+      data.gold.forEach(r => rows.push(["黃金", "", r.item, r.gram, r.gold + r.labor, data.rates.goldGram, r.gram * data.rates.goldGram]));
+      data.silver.forEach(r => rows.push(["白銀", "", r.item, r.qty * r.oz, r.cost, data.rates.silverOz, r.qty * r.oz * data.rates.silverOz]));
+      data.pnlCalendar.forEach(r => rows.push(["損益行事曆", r.date, r.note, "", r.twGain, r.usGain, r.totalGain]));
+      download("personal-assets-demo.csv", rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n"), "text/csv;charset=utf-8");
+    }
+    function exportSymbols() {
+      const payload = {
+        generatedAt: new Date().toISOString(),
+        tw: data.tw.map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
+        us: data.us.map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
+      };
+      download("price-symbols.json", JSON.stringify(payload, null, 2), "application/json");
+      toast("已匯出 price-symbols.json");
+    }
+    function applyLatestPrices(payload) {
+      const prices = payload.prices || {};
+      let updated = 0;
+      const updateRows = (rows, market) => {
+        rows.forEach(row => {
+          const key = `${market}:${String(row.code).toUpperCase()}`;
+          const quote = prices[key] || prices[String(row.code).toUpperCase()] || prices[row.code];
+          if (quote && Number.isFinite(Number(quote.price))) {
+            row.price = Number(quote.price);
+            updated += 1;
+          }
+        });
+      };
+      updateRows(data.tw, "TW");
+      updateRows(data.us, "US");
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      render();
+      toast(updated ? `已更新 ${updated} 檔最新股價` : "沒有找到可套用的股價");
+    }
+    function toast(msg) {
+      const box = document.createElement("div");
+      box.textContent = msg;
+      box.style.cssText = "position:fixed;right:24px;bottom:24px;background:#101c34;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);z-index:10";
+      document.body.appendChild(box);
+      setTimeout(() => box.remove(), 1800);
+    }
+    document.addEventListener("click", (e) => {
+      const tab = e.target.closest("[data-tab]");
+      if (tab) {
+        currentTab = tab.dataset.tab;
+        render();
+      }
+    });
+    document.getElementById("saveData").addEventListener("click", () => document.getElementById("importJson").click());
+    document.getElementById("importJson").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      data = JSON.parse(await file.text());
+      persist();
+      render();
+    });
+    document.getElementById("priceJson").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      applyLatestPrices(JSON.parse(await file.text()));
+      e.target.value = "";
+    });
+    document.getElementById("exportJson").addEventListener("click", () => download("personal-assets-demo.json", JSON.stringify(data, null, 2), "application/json"));
+    document.getElementById("exportCsv").addEventListener("click", exportCsv);
+    document.getElementById("exportSymbols").addEventListener("click", exportSymbols);
+    document.getElementById("importPrices").addEventListener("click", () => document.getElementById("priceJson").click());
+    document.getElementById("resetData").addEventListener("click", () => {
+      if (confirm("要重設為展示資料嗎？")) {
+        data = structuredClone(seed);
+        persist();
+        render();
+      }
+    });
+    render();
+  </script>
+</body>
+</html>
