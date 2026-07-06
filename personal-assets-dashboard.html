@@ -376,6 +376,7 @@
     };
     let data = load();
     let currentTab = "overview";
+    let calendarMonth = null;
 
     function load() {
       try {
@@ -432,6 +433,16 @@
       const month = String(date.getMonth() + 1).padStart(2, "0");
       const day = String(date.getDate()).padStart(2, "0");
       return `${year}-${month}-${day}`;
+    }
+    function localMonthString(date = new Date()) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      return `${year}-${month}`;
+    }
+    function shiftMonth(month, delta) {
+      const [year, monthNumber] = month.split("-").map(Number);
+      const date = new Date(year, monthNumber - 1 + delta, 1);
+      return localMonthString(date);
     }
     function textInput(value, path, type = "text") {
       const step = type === "number" ? ` step="any"` : "";
@@ -574,7 +585,8 @@
       const latest = rows.at(-1) || { totalGain: 0 };
       const previous = rows.at(-2) || { totalGain: latest.totalGain };
       const delta = latest.totalGain - previous.totalGain;
-      const month = (latest.date || new Date().toISOString().slice(0, 10)).slice(0, 7);
+      const month = calendarMonth || (latest.date || localDateString()).slice(0, 7);
+      calendarMonth = month;
       const byDate = Object.fromEntries(rows.filter(r => r.date.startsWith(month)).map(r => [r.date, r]));
       const first = new Date(`${month}-01T00:00:00`);
       const lastDate = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
@@ -588,7 +600,7 @@
         const dayDelta = row && prev ? row.totalGain - prev.totalGain : 0;
         cells.push(`<div class="day-card"><strong>${day}</strong>${row ? `<span class="delta ${dayDelta >= 0 ? "ok" : "gain"}">${dayDelta >= 0 ? "+" : ""}${money(dayDelta)}</span><small>未實現損益 ${money(row.totalGain)}<br>${row.note || ""}</small>` : `<small>尚未記錄</small>`}</div>`);
       }
-      return `${section("pnlCalendar", "股票每日未實現損益變動行事曆", "按一下即可用目前台股與美股持股資料記錄今日未實現損益；若今天已有紀錄會直接更新。", `<button class="btn blue small" data-snapshot-pnl>一鍵記錄今日快照</button>`)}
+      return `${section("pnlCalendar", "股票每日未實現損益變動行事曆", "按一下即可用目前台股與美股持股資料記錄今日未實現損益；若今天已有紀錄會直接更新。", `<button class="btn small" data-calendar-prev>‹ 上一月</button><button class="btn small" data-calendar-next>下一月 ›</button><button class="btn blue small" data-snapshot-pnl>一鍵記錄今日快照</button>`)}
         <div class="cards">
           ${card("最新未實現損益", money(latest.totalGain), "TWD", "accent")}
           ${card("較前次變動", `${delta >= 0 ? "+" : ""}${money(delta)}`, "TWD")}
@@ -686,6 +698,7 @@
         data.pnlCalendar.push(snapshot);
         toast("已新增今日損益快照");
       }
+      calendarMonth = snapshot.date.slice(0, 7);
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
     }
@@ -701,6 +714,8 @@
       document.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => delPath(el.dataset.del)));
       document.querySelectorAll("[data-add]").forEach(el => el.addEventListener("click", () => addRow(el.dataset.add)));
       document.querySelectorAll("[data-snapshot-pnl]").forEach(el => el.addEventListener("click", recordTodaySnapshot));
+      document.querySelectorAll("[data-calendar-prev]").forEach(el => el.addEventListener("click", () => { calendarMonth = shiftMonth(calendarMonth || localMonthString(), -1); render(); }));
+      document.querySelectorAll("[data-calendar-next]").forEach(el => el.addEventListener("click", () => { calendarMonth = shiftMonth(calendarMonth || localMonthString(), 1); render(); }));
     }
     function download(name, text, type) {
       const a = document.createElement("a");
