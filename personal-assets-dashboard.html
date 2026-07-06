@@ -247,6 +247,38 @@
       background: #fbfcfe;
       line-height: 1.7;
     }
+    .setting-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 12px;
+      margin-top: 14px;
+    }
+    .setting-tile {
+      min-height: 92px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: #fff;
+    }
+    .setting-tile .label {
+      display: block;
+      margin-bottom: 8px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
+    .setting-tile input {
+      width: 100%;
+      max-width: 100%;
+      min-height: 34px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .setting-tile .unit {
+      display: block;
+      margin-top: 7px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, minmax(120px, 1fr));
@@ -392,6 +424,9 @@
     function card(label, value, unit, cls = "") {
       return `<article class="card ${cls}"><span class="label">${label}</span><strong class="number">${value}</strong><span class="unit">${unit}</span></article>`;
     }
+    function settingTile(label, value, unit) {
+      return `<div class="setting-tile"><span class="label">${label}</span>${value}<span class="unit">${unit}</span></div>`;
+    }
     function localDateString(date = new Date()) {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -475,8 +510,8 @@
         <article class="panel"><div class="panel-pad">
           <h3>幣別匯率設定</h3>
           <p class="section-note">每 1 單位外幣折合台幣金額；TWD 固定為 1。若新增其他幣別，會自動出現在這裡。</p>
-          <div class="cards" style="margin-top:14px">
-            ${currencies.map(code => card(code, textInput(fxRate(code), `fxRates.${code}`, "number"), "TWD / 1 " + code)).join("")}
+          <div class="setting-grid">
+            ${currencies.map(code => settingTile(code, textInput(fxRate(code), `fxRates.${code}`, "number"), "TWD / 1 " + code)).join("")}
           </div>
         </div></article>
         <article class="panel"><div class="table-wrap"><table>
@@ -525,7 +560,7 @@
     function renderDca() {
       const codes = [...new Set(["0050", "00981A", "VOO", "QQQ", ...data.dca.flatMap(row => Object.keys(row).filter(key => key !== "month"))])];
       return `${section("dca", "定期定額追蹤", "", `<button class="btn purple small" data-add="dca">+ 新增月份紀錄</button>`)}
-        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="cards" style="margin-top:14px">${codes.map(c => card(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
+        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="setting-grid">${codes.map(c => settingTile(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
         <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td><input type="checkbox" ${r[c] ? "checked" : ""} data-path="dca.${i}.${c}"></td>`).join("")}<td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
     }
     function currentStockGain() {
