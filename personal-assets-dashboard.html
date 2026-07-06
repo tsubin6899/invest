@@ -364,6 +364,9 @@
     function money(n, currency = "TWD") {
       return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: currency === "USD" ? 2 : 0 }).format(Number(n) || 0);
     }
+    function rateText(n) {
+      return new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 6 }).format(Number(n) || 0);
+    }
     function sum(rows, fn) { return rows.reduce((t, r) => t + fn(r), 0); }
     function normalizeCurrency(value) { return String(value || "TWD").trim().toUpperCase(); }
     function fxRate(currency) { return Number(data.fxRates?.[normalizeCurrency(currency)] ?? 1) || 1; }
@@ -396,7 +399,8 @@
       return `${year}-${month}-${day}`;
     }
     function textInput(value, path, type = "text") {
-      return `<input type="${type}" value="${value}" data-path="${path}">`;
+      const step = type === "number" ? ` step="any"` : "";
+      return `<input type="${type}"${step} value="${value}" data-path="${path}">`;
     }
     function section(id, title, note = "", tools = "") {
       return `<div class="section-head"><div><h2>${title}</h2>${note ? `<p class="section-note">${note}</p>` : ""}</div>${tools}</div>`;
@@ -476,7 +480,7 @@
         </div></article>
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr><th>銀行名稱</th><th>幣別</th><th>匯率</th><th>現金餘額</th><th>折台幣</th><th>操作</th></tr></thead>
-          <tbody>${data.cash.map((r, i) => `<tr><td>${textInput(r.bank, `cash.${i}.bank`)}</td><td>${textInput(normalizeCurrency(r.currency), `cash.${i}.currency`)}</td><td>${money(fxRate(r.currency))}</td><td>${textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td><button class="icon-btn" data-del="cash.${i}">刪</button></td></tr>`).join("")}</tbody>
+          <tbody>${data.cash.map((r, i) => `<tr><td>${textInput(r.bank, `cash.${i}.bank`)}</td><td>${textInput(normalizeCurrency(r.currency), `cash.${i}.currency`)}</td><td>${rateText(fxRate(r.currency))}</td><td>${textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td><button class="icon-btn" data-del="cash.${i}">刪</button></td></tr>`).join("")}</tbody>
         </table></div></article>
         <article class="panel"><div class="panel-pad">${section("cards", "信用卡款項紀錄", "只記錄各張卡本期待繳總額。", `<button class="btn green small" data-add="cards">+ 新增信用卡款項</button>`)}
           <div class="table-wrap"><table><thead><tr><th>信用卡 / 銀行</th><th>本期待繳金額</th><th>繳款期限</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.cards.map((r, i) => `<tr><td>${textInput(r.card, `cards.${i}.card`)}</td><td>${textInput(r.amount, `cards.${i}.amount`, "number")}</td><td>${textInput(r.due, `cards.${i}.due`)}</td><td>${textInput(r.note, `cards.${i}.note`)}</td><td><button class="icon-btn" data-del="cards.${i}">刪</button></td></tr>`).join("")}</tbody></table></div>
