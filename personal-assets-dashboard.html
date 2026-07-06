@@ -346,6 +346,7 @@
     <section class="view" id="silver"></section>
     <section class="view" id="fund"></section>
     <section class="view" id="dca"></section>
+    <section class="view" id="purchase"></section>
     <section class="view" id="expense"></section>
     <section class="view" id="allocation"></section>
     <section class="view" id="chart"></section>
@@ -356,6 +357,7 @@
     const tabs = [
       ["overview", "總覽儀表板"], ["tw", "台股部位"], ["us", "美股部位"], ["cash", "現金帳戶"],
       ["gold", "實體黃金"], ["silver", "實體白銀"], ["fund", "台幣基金"], ["dca", "定期投入"],
+      ["purchase", "購買股票紀錄"],
       ["expense", "支出規畫"], ["allocation", "額外資金分配"],
       ["chart", "資訊圖表庫"]
     ];
@@ -370,6 +372,7 @@
       silver: [],
       funds: [],
       dca: [],
+      purchaseRecords: [],
       budget: [],
       pnlCalendar: [],
       allocation: []
@@ -397,6 +400,9 @@
     function money(n, currency = "TWD") {
       return new Intl.NumberFormat("zh-TW", { maximumFractionDigits: currency === "USD" ? 2 : 0 }).format(Number(n) || 0);
     }
+    function moneyFixed(n, currency = "TWD", digits = 2) {
+      return new Intl.NumberFormat("zh-TW", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(Number(n) || 0);
+    }
     function rateText(n) {
       return new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 6 }).format(Number(n) || 0);
     }
@@ -413,14 +419,15 @@
     function allTotals() {
       const tw = stockValue(data.tw);
       const us = stockValue(data.us, data.rates.usd);
-      const cash = sum(data.cash, twdCash);
+      const cash = sum(data.cash, twdCash) + (Number(data.rates.reserve) || 0);
       const cards = sum(data.cards, r => r.amount);
       const gold = goldGram() * data.rates.goldGram;
       const silver = silverOz() * data.rates.silverOz;
       const fund = sum(data.funds, r => r.units * r.nav);
       const total = tw + us + cash + gold + silver + fund - cards;
       const cost = stockCost(data.tw) + stockCost(data.us, data.rates.usd) + goldCost() + silverCost() + sum(data.funds, r => r.cost);
-      return { tw, us, cash, cards, gold, silver, fund, total, cost, gain: total - cost - cards };
+      const gain = (tw + us + gold + silver + fund) - cost;
+      return { tw, us, cash, cards, gold, silver, fund, total, cost, gain };
     }
     function card(label, value, unit, cls = "") {
       return `<article class="card ${cls}"><span class="label">${label}</span><strong class="number">${value}</strong><span class="unit">${unit}</span></article>`;
@@ -447,6 +454,12 @@
     function textInput(value, path, type = "text") {
       const step = type === "number" ? ` step="any"` : "";
       return `<input type="${type}"${step} value="${value}" data-path="${path}">`;
+    }
+    function dateInput(value, path) {
+      return textInput(value || localDateString(), path, "date");
+    }
+    function selectInput(value, path, options) {
+      return `<select data-path="${path}">${options.map(([val, label]) => `<option value="${val}" ${String(value || options[0][0]) === val ? "selected" : ""}>${label}</option>`).join("")}</select>`;
     }
     function section(id, title, note = "", tools = "") {
       return `<div class="section-head"><div><h2>${title}</h2>${note ? `<p class="section-note">${note}</p>` : ""}</div>${tools}</div>`;
@@ -579,6 +592,101 @@
         <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="setting-grid">${codes.map(c => settingTile(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
         <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td><input type="checkbox" ${r[c] ? "checked" : ""} data-path="dca.${i}.${c}"></td>`).join("")}<td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
     }
+    function purchaseCost(row) {
+      const gross = (Number(row.shares) || 0) * (Number(row.price) || 0);
+      const fees = (Number(row.fee) || 0) + (Number(row.tax) || 0);
+      return tradeType(row) === "sell" ? Math.max(0, gross - fees) : gross + fees;
+    }
+    function purchaseCostTwd(row) {
+      return purchaseCost(row) * fxRate(tradeCurrency(row));
+    }
+    function tradeType(row) {
+      const value = String(row.type || row.action || "buy").toLowerCase();
+      return value === "sell" || value.includes("賣") ? "sell" : "buy";
+    }
+    function tradeCurrency(row) {
+      return normalizeCurrency(row.currency || (row.market === "US" ? "USD" : "TWD"));
+    }
+    function tradeKey(row) {
+      return `${String(row.market || "TW").toUpperCase()}:${String(row.code || "").toUpperCase()}:${tradeCurrency(row)}`;
+    }
+    function buildTradeSummary() {
+      const positions = new Map();
+      const realizedByIndex = new Map();
+      const source = data.purchaseRecords.map((row, index) => ({ row, index })).sort((a, b) => {
+        const dateDiff = String(a.row.date || "").localeCompare(String(b.row.date || ""));
+        return dateDiff || a.index - b.index;
+      });
+      const totals = { buyTwd: 0, sellTwd: 0, realizedTwd: 0, soldBasisTwd: 0 };
+      source.forEach(({ row, index }) => {
+        const type = tradeType(row);
+        const currency = tradeCurrency(row);
+        const fx = fxRate(currency);
+        const shares = Number(row.shares) || 0;
+        const gross = shares * (Number(row.price) || 0);
+        const fees = (Number(row.fee) || 0) + (Number(row.tax) || 0);
+        const key = tradeKey(row);
+        const position = positions.get(key) || { market: row.market || "TW", currency, code: row.code || "", name: row.name || "", bought: 0, sold: 0, shares: 0, basis: 0, realized: 0, soldBasis: 0 };
+        position.name = row.name || position.name;
+        position.market = row.market || position.market;
+        if (type === "sell") {
+          const avgCost = position.shares ? position.basis / position.shares : 0;
+          const soldBasis = avgCost * shares;
+          const proceeds = Math.max(0, gross - fees);
+          const realized = proceeds - soldBasis;
+          position.sold += shares;
+          position.shares -= shares;
+          position.basis -= soldBasis;
+          position.realized += realized;
+          position.soldBasis += soldBasis;
+          totals.sellTwd += proceeds * fx;
+          totals.realizedTwd += realized * fx;
+          totals.soldBasisTwd += soldBasis * fx;
+          realizedByIndex.set(index, realized);
+        } else {
+          const cost = gross + fees;
+          position.bought += shares;
+          position.shares += shares;
+          position.basis += cost;
+          totals.buyTwd += cost * fx;
+          realizedByIndex.set(index, null);
+        }
+        if (position.shares < 0) position.shares = 0;
+        if (position.basis < 0) position.basis = 0;
+        positions.set(key, position);
+      });
+      return { totals, realizedByIndex, positions: [...positions.values()] };
+    }
+    function renderPurchaseRecords() {
+      const summary = buildTradeSummary();
+      const rate = summary.totals.soldBasisTwd ? summary.totals.realizedTwd / summary.totals.soldBasisTwd * 100 : 0;
+      const sortedRecords = data.purchaseRecords
+        .map((row, index) => ({ row, index }))
+        .sort((a, b) => String(b.row.date || "").localeCompare(String(a.row.date || "")) || b.index - a.index);
+      return `${section("purchase", "購買股票紀錄", "記錄買入與賣出股票，並以平均成本法計算已實現損益；此分頁只做紀錄，不會自動改動目前持股。", `<button class="btn green small" data-add="purchaseRecords">+ 新增交易紀錄</button>`)}
+        <div class="cards">
+          ${card("累計買入成本", money(summary.totals.buyTwd), "TWD，依幣別匯率換算")}
+          ${card("累計賣出金額", money(summary.totals.sellTwd), "TWD，已扣除費用稅費")}
+          ${card("已實現損益", money(summary.totals.realizedTwd), "TWD", "accent")}
+          ${card("已實現報酬率", `${rate.toFixed(2)}%`, "賣出成本基準")}
+        </div>
+        <article class="panel"><div class="table-wrap"><table>
+          <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>備註</th><th>操作</th></tr></thead>
+          <tbody>${sortedRecords.map(({ row: r, index: i }) => {
+            const type = tradeType(r);
+            const realized = summary.realizedByIndex.get(i);
+            const cashFlow = type === "sell" ? purchaseCost(r) : -purchaseCost(r);
+            return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td>${textInput(r.note || "", `purchaseRecords.${i}.note`)}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
+          }).join("")}</tbody>
+        </table></div></article>
+        <article class="panel"><div class="panel-pad"><h3>個股交易彙總</h3></div><div class="table-wrap"><table>
+          <thead><tr><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>累計買入股數</th><th>累計賣出股數</th><th>剩餘股數</th><th>平均成本</th><th>已實現損益</th></tr></thead>
+          <tbody>${summary.positions.map(r => {
+            const avg = r.shares ? r.basis / r.shares : 0;
+            return `<tr><td>${r.market}</td><td>${r.currency}</td><td>${r.code}</td><td>${r.name}</td><td>${money(r.bought, "")}</td><td>${money(r.sold, "")}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(avg, r.currency, 2)}</td><td class="${r.realized >= 0 ? "ok" : "gain"}">${money(r.realized, r.currency)}</td></tr>`;
+          }).join("")}</tbody>
+        </table></div></article>`;
+    }
     function currentStockGain() {
       return {
         twGain: stockValue(data.tw) - stockCost(data.tw),
@@ -650,6 +758,7 @@
       document.getElementById("silver").innerHTML = renderMetals("silver");
       document.getElementById("fund").innerHTML = renderFund();
       document.getElementById("dca").innerHTML = renderDca();
+      document.getElementById("purchase").innerHTML = renderPurchaseRecords();
       document.getElementById("expense").innerHTML = renderGeneric("expense", "支出規畫");
       document.getElementById("allocation").innerHTML = renderGeneric("allocation", "額外資金分配");
       document.getElementById("chart").innerHTML = renderGeneric("chart", "資訊圖表庫");
@@ -676,6 +785,7 @@
         silver: { date: "2026-07-06", item: "新白銀", qty: 0, oz: 1, cost: 0, note: "" },
         funds: { name: "新基金", units: 0, cost: 0, nav: 0 },
         dca: { month: "2026.08", "0050": false, "00981A": false, VOO: false, QQQ: false },
+        purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
         pnlCalendar: makeTodaySnapshot(),
         allocation: { target: "新目標", ratio: 0 }
@@ -736,6 +846,8 @@
       data.cash.forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
       data.gold.forEach(r => rows.push(["黃金", "", r.item, r.gram, r.gold + r.labor, data.rates.goldGram, r.gram * data.rates.goldGram]));
       data.silver.forEach(r => rows.push(["白銀", "", r.item, r.qty * r.oz, r.cost, data.rates.silverOz, r.qty * r.oz * data.rates.silverOz]));
+      const tradeSummary = buildTradeSummary();
+      data.purchaseRecords.forEach((r, i) => rows.push(["股票交易紀錄", r.code, `${r.date} ${tradeType(r) === "sell" ? "賣出" : "買入"} ${r.market} ${r.name}`, r.shares, purchaseCost(r), r.price, tradeSummary.realizedByIndex.get(i) ?? ""]));
       data.pnlCalendar.forEach(r => rows.push(["損益行事曆", r.date, r.note, "", r.twGain, r.usGain, r.totalGain]));
       download("personal-assets-demo.csv", rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n"), "text/csv;charset=utf-8");
     }
@@ -785,9 +897,15 @@
     document.getElementById("importJson").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      data = JSON.parse(await file.text());
+      const payload = JSON.parse(await file.text());
+      if (payload.kind === "personal-assets-purchase-records" || Array.isArray(payload.purchaseRecords)) {
+        data.purchaseRecords = [...(data.purchaseRecords || []), ...payload.purchaseRecords];
+      } else {
+        data = payload;
+      }
       persist();
       render();
+      e.target.value = "";
     });
     document.getElementById("priceJson").addEventListener("change", async (e) => {
       const file = e.target.files[0];
