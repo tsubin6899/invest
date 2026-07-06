@@ -523,9 +523,9 @@
         <article class="panel"><div class="table-wrap"><table><thead><tr><th>基金名稱</th><th>總投入金額</th><th>購入單位數</th><th>目前淨值</th><th>現值</th><th>操作</th></tr></thead><tbody>${data.funds.map((r, i) => `<tr><td>${textInput(r.name, `funds.${i}.name`)}</td><td>${textInput(r.cost, `funds.${i}.cost`, "number")}</td><td>${textInput(r.units, `funds.${i}.units`, "number")}</td><td>${textInput(r.nav, `funds.${i}.nav`, "number")}</td><td>${money(r.units * r.nav)}</td><td><button class="icon-btn" data-del="funds.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
     }
     function renderDca() {
-      const codes = ["0050", "00981A", "VOO", "QQQ"];
+      const codes = [...new Set(["0050", "00981A", "VOO", "QQQ", ...data.dca.flatMap(row => Object.keys(row).filter(key => key !== "month"))])];
       return `${section("dca", "定期定額追蹤", "", `<button class="btn purple small" data-add="dca">+ 新增月份紀錄</button>`)}
-        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="cards" style="margin-top:14px">${codes.map(c => card(c, textInput(0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
+        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="cards" style="margin-top:14px">${codes.map(c => card(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
         <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td><input type="checkbox" ${r[c] ? "checked" : ""} data-path="dca.${i}.${c}"></td>`).join("")}<td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
     }
     function currentStockGain() {
