@@ -421,7 +421,7 @@
     <section class="actions" aria-label="操作工具">
       <button class="btn purple" id="exportCsv">匯出報表 (CSV)</button>
       <button class="btn blue" id="exportSymbols">匯出代碼清單</button>
-      <button class="btn green" id="importPrices">套用最新股價</button>
+      <button class="btn green" id="importPrices">套用最新股價與匯率</button>
       <button class="btn green" id="saveData">匯入存檔</button>
       <button class="btn blue" id="exportJson">匯出存檔 (JSON)</button>
       <button class="btn dark" id="resetData">清空資料</button>
@@ -457,6 +457,7 @@
     const seed = {
       rates: { usd: 31.8, goldGram: 2980, silverOz: 1850, reserve: 0 },
       fxRates: { TWD: 1, USD: 31.8, JPY: 0.22, EUR: 34.5, CNY: 4.4, HKD: 4.05 },
+      fxRateMeta: { generatedAt: "", source: "手動設定" },
       tw: [],
       us: [],
       cash: [],
@@ -469,6 +470,10 @@
       purchaseRecords: [],
       budget: [],
       pnlCalendar: [],
+      assetSnapshots: [],
+      dividends: [],
+      safety: { monthlyExpense: 0, safetyMonths: 6 },
+      targetAllocation: { tw: 40, us: 20, cash: 20, gold: 10, silver: 0, fund: 10 },
       allocation: []
     };
     let data = load();
@@ -482,7 +487,10 @@
           ...structuredClone(seed),
           ...saved,
           rates: { ...seed.rates, ...(saved.rates || {}) },
-          fxRates: { ...seed.fxRates, ...(saved.fxRates || {}) }
+          fxRates: { ...seed.fxRates, ...(saved.fxRates || {}) },
+          fxRateMeta: { ...seed.fxRateMeta, ...(saved.fxRateMeta || {}) },
+          safety: { ...seed.safety, ...(saved.safety || {}) },
+          targetAllocation: { ...seed.targetAllocation, ...(saved.targetAllocation || {}) }
         } : structuredClone(seed);
       }
       catch { return structuredClone(seed); }
@@ -499,7 +507,10 @@
         ...structuredClone(seed),
         ...(payload || {}),
         rates: { ...seed.rates, ...((payload || {}).rates || {}) },
-        fxRates: { ...seed.fxRates, ...((payload || {}).fxRates || {}) }
+        fxRates: { ...seed.fxRates, ...((payload || {}).fxRates || {}) },
+        fxRateMeta: { ...seed.fxRateMeta, ...((payload || {}).fxRateMeta || {}) },
+        safety: { ...seed.safety, ...((payload || {}).safety || {}) },
+        targetAllocation: { ...seed.targetAllocation, ...((payload || {}).targetAllocation || {}) }
       };
     }
     function purchaseRecordKey(row) {
@@ -678,7 +689,8 @@
         const raw = Number(row.rawValue ?? row.value) || 0;
         const width = Math.max(3, Math.abs(Number(row.value) || raw) / max * 100);
         const color = row.color || (raw < 0 ? "var(--red)" : chartColors[index % chartColors.length]);
-        return `<div class="bar-row"><strong>${row.label}</strong><div class="bar-track"><span class="bar-fill" style="--w:${width.toFixed(1)}%;--bar:${color}"></span></div><span class="${raw < 0 ? "gain" : "ok"}">${money(raw, currency)}</span></div>`;
+        const displayValue = currency === "%" ? `${raw.toFixed(1)}%` : money(raw, currency);
+        return `<div class="bar-row"><strong>${row.label}</strong><div class="bar-track"><span class="bar-fill" style="--w:${width.toFixed(1)}%;--bar:${color}"></span></div><span class="${raw < 0 ? "gain" : "ok"}">${displayValue}</span></div>`;
       }).join("")}</div></article>`;
     }
     function renderTrendChart(title, rows) {
@@ -731,6 +743,100 @@
         return { label: row.month || "-", value: total, rawValue: total };
       }).sort((a, b) => String(a.label).localeCompare(String(b.label))).slice(-12);
     }
+    function assetSnapshotRows() {
+      return [...(data.assetSnapshots || [])].filter(row => row.date).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+    }
+    function makeAssetSnapshot() {
+      const t = allTotals();
+      const investment = t.tw + t.us + t.gold + t.silver + t.fund;
+      return {
+        date: localDateString(),
+        total: Math.round(t.total),
+        cash: Math.round(t.cash),
+        investment: Math.round(investment),
+        cards: Math.round(t.cards),
+        net: Math.round(t.total - t.cards)
+      };
+    }
+    function targetRows(t) {
+      const labels = { tw: "台股", us: "美股", cash: "現金", gold: "黃金", silver: "白銀", fund: "基金" };
+      const actual = { tw: t.tw, us: t.us, cash: t.cash, gold: t.gold, silver: t.silver, fund: t.fund };
+      return Object.keys(labels).map(key => {
+        const actualPct = t.total ? actual[key] / t.total * 100 : 0;
+        const targetPct = Number(data.targetAllocation?.[key]) || 0;
+        return {
+          key,
+          label: labels[key],
+          actualValue: actual[key],
+          actualPct,
+          targetPct,
+          diff: actualPct - targetPct
+        };
+      });
+    }
+    function usdExposure() {
+      const usStocksUsd = sum(data.us, row => (Number(row.shares) || 0) * (Number(row.price) || 0));
+      const usdCash = sum(data.cash.filter(row => normalizeCurrency(row.currency) === "USD"), row => Number(row.amount) || 0);
+      return usStocksUsd + usdCash;
+    }
+    function dividendTwd(row) {
+      return (Number(row.amount) || 0) * fxRate(row.currency || "TWD");
+    }
+    function annualSummaryRows() {
+      const year = String(new Date().getFullYear());
+      const summary = buildTradeSummary();
+      const dividends = sum((data.dividends || []).filter(row => String(row.date || "").startsWith(year)), dividendTwd);
+      const snapshots = assetSnapshotRows().filter(row => String(row.date || "").startsWith(year));
+      const first = snapshots[0];
+      const last = snapshots.at(-1);
+      const growth = first && last ? (Number(last.net) || 0) - (Number(first.net) || 0) : 0;
+      return [
+        { label: "已實現損益", value: Math.round(summary.totals.realizedTwd), rawValue: Math.round(summary.totals.realizedTwd) },
+        { label: "配息收入", value: Math.round(dividends), rawValue: Math.round(dividends) },
+        { label: "年度淨資產變化", value: Math.abs(Math.round(growth)), rawValue: Math.round(growth) },
+        { label: "目前未實現損益", value: Math.abs(Math.round(allTotals().gain)), rawValue: Math.round(allTotals().gain) }
+      ];
+    }
+    function dataHealthItems() {
+      const issues = [];
+      const checkStock = (rows, market) => rows.forEach(row => {
+        const code = row.code || "未填代號";
+        if (!Number(row.price)) issues.push(`${market} ${code} 缺少目前股價`);
+        if (!Number(row.cost)) issues.push(`${market} ${code} 平均成本為 0`);
+        if (!Number(row.shares)) issues.push(`${market} ${code} 持股數為 0`);
+      });
+      checkStock(data.tw, "台股");
+      checkStock(data.us, "美股");
+      data.cash.forEach(row => {
+        const currency = normalizeCurrency(row.currency);
+        if (!fxRate(currency)) issues.push(`${currency} 匯率未設定`);
+      });
+      if (!Number(data.safety?.monthlyExpense)) issues.push("尚未設定每月固定支出，現金安全水位無法判讀");
+      if (!(data.assetSnapshots || []).length) issues.push("尚未建立資產快照，無法追蹤淨資產歷史");
+      return issues;
+    }
+    function renderTargetSettings() {
+      const keys = [
+        ["tw", "台股"], ["us", "美股"], ["cash", "現金"],
+        ["gold", "黃金"], ["silver", "白銀"], ["fund", "基金"]
+      ];
+      return `<article class="chart-card"><h3>目標配置設定</h3><div class="setting-grid">${keys.map(([key, label]) => settingTile(label, textInput(Number(data.targetAllocation?.[key]) || 0, `targetAllocation.${key}`, "number"), "目標比例 %")).join("")}</div></article>`;
+    }
+    function renderSafetySettings() {
+      const monthly = Number(data.safety?.monthlyExpense) || 0;
+      const months = Number(data.safety?.safetyMonths) || 6;
+      const cash = Math.max(0, allTotals().cash);
+      const covered = monthly ? cash / monthly : 0;
+      return `<article class="chart-card"><h3>現金安全水位</h3><div class="cards" style="grid-template-columns:repeat(2,minmax(0,1fr));margin-bottom:14px">${card("可支撐月數", monthly ? covered.toFixed(1) : "-", `目標 ${months} 個月`, covered >= months ? "" : "accent")}${card("安全準備金目標", money(monthly * months), "TWD")}</div><div class="setting-grid">${settingTile("每月固定支出", textInput(monthly, "safety.monthlyExpense", "number"), "TWD / 月")}${settingTile("目標安全月數", textInput(months, "safety.safetyMonths", "number"), "月")}</div></article>`;
+    }
+    function renderDividendTable() {
+      return `<article class="chart-card"><h3>股息 / 配息紀錄</h3><button class="btn green small" data-add="dividends">+ 新增配息</button><div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>日期</th><th>來源</th><th>幣別</th><th>金額</th><th>折台幣</th><th>備註</th><th>操作</th></tr></thead><tbody>${(data.dividends || []).map((row, i) => `<tr><td>${dateInput(row.date, `dividends.${i}.date`)}</td><td>${textInput(row.source || "", `dividends.${i}.source`)}</td><td>${textInput(normalizeCurrency(row.currency || "TWD"), `dividends.${i}.currency`)}</td><td>${textInput(row.amount || 0, `dividends.${i}.amount`, "number")}</td><td>${money(dividendTwd(row))}</td><td>${textInput(row.note || "", `dividends.${i}.note`)}</td><td><button class="icon-btn" data-del="dividends.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+    }
+    function renderHealthCheck() {
+      const issues = dataHealthItems();
+      return `<article class="chart-card"><h3>資料健康檢查</h3>${issues.length ? `<div class="bar-list">${issues.map((issue, i) => `<div class="legend-row"><span class="dot" style="--c:${chartColors[(i + 4) % chartColors.length]}"></span><strong>提醒</strong><span>${issue}</span></div>`).join("")}</div>` : `<div class="chart-empty">目前沒有明顯資料問題</div>`}</article>`;
+    }
+
     function renderInfoCharts() {
       const t = allTotals();
       const investment = t.tw + t.us + t.gold + t.silver + t.fund;
@@ -750,16 +856,28 @@
       ];
       const winners = [...stockRows].sort((a, b) => b.gain - a.gain).slice(0, 5).map(row => ({ label: row.label, value: Math.abs(row.gain), rawValue: row.gain }));
       const losers = [...stockRows].sort((a, b) => a.gain - b.gain).slice(0, 5).map(row => ({ label: row.label, value: Math.abs(row.gain), rawValue: row.gain }));
-      const latestSnapshot = [...(data.pnlCalendar || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))).at(-1) || {};
-      return `${section("chart", "資訊圖表庫", "用 8 個圖表快速判讀目前資產狀態。")}
+      const snapshots = assetSnapshotRows();
+      const latestSnapshot = snapshots.at(-1) || makeAssetSnapshot();
+      const target = targetRows(t);
+      const rebalanceRows = target.map(row => ({ label: `${row.label} ${row.diff >= 0 ? "偏高" : "偏低"}`, value: Math.abs(row.diff), rawValue: row.diff, color: Math.abs(row.diff) >= 5 ? "var(--red)" : "var(--green)" }));
+      const usdImpact = usdExposure();
+      return `${section("chart", "資訊圖表庫", "整合資產快照、配置目標、現金安全、收益與資料檢查。", `<button class="btn blue small" data-asset-snapshot>記錄今日資產快照</button>`)}
         <div class="cards">
           ${card("總資產", money(t.total), "TWD", "dark")}
           ${card("投資資產", money(investment), "TWD")}
           ${card("現金類資產", money(cash), "TWD")}
-          ${card("最新損益快照", money(Number(latestSnapshot.totalGain) || 0), latestSnapshot.date || "尚未記錄", "accent")}
+          ${card("最新資產快照", money(Number(latestSnapshot.net ?? latestSnapshot.total) || 0), latestSnapshot.date || "今日估算", "accent")}
         </div>
         <div class="chart-grid">
-          ${renderPieChart("1. 資產配置比例", [
+          ${renderTrendChart("1. 資產快照歷史", snapshots.map(row => ({ date: row.date, totalGain: Number(row.net ?? row.total) || 0 })))}
+          ${renderPieChart("2. 目標配置 vs 實際配置", target.map(row => ({ label: `${row.label} 實際`, value: Math.max(0, row.actualValue) })), "實際配置", "TWD")}
+          ${renderBarChart("3. 再平衡提醒", rebalanceRows, "%")}
+          ${renderSafetySettings()}
+          ${renderBarChart("5. 匯率敏感度", [{ label: "USD/TWD 每變動 1 元", value: Math.abs(usdImpact), rawValue: usdImpact, color: "var(--teal)" }], "TWD")}
+          ${renderDividendTable()}
+          ${renderBarChart("7. 年度損益總結", annualSummaryRows(), "TWD")}
+          ${renderHealthCheck()}
+          ${renderPieChart("資產配置比例", [
             { label: "台股", value: t.tw },
             { label: "美股", value: t.us },
             { label: "現金", value: t.cash },
@@ -767,21 +885,22 @@
             { label: "白銀", value: t.silver },
             { label: "基金", value: t.fund }
           ], "總資產", "TWD")}
-          ${renderPieChart("2. 投資資產 vs 現金比例", [
+          ${renderPieChart("投資資產 vs 現金比例", [
             { label: "投資資產", value: investment },
             { label: "現金類", value: cash }
           ], "資產分布", "TWD")}
-          ${renderBarChart("3. 未實現損益分布", gainRows, "TWD")}
-          ${renderBarChart("4A. 個股獲利前 5 名", winners, "TWD")}
-          ${renderBarChart("4B. 個股虧損前 5 名", losers, "TWD")}
-          ${renderPieChart("5. 現金幣別配置", cashCurrencyShareItems(), "折合台幣", "TWD")}
-          ${renderBarChart("6. 每月定期投入趨勢", monthlyDcaTotals(), "TWD")}
-          ${renderTrendChart("7. 每日未實現損益走勢", data.pnlCalendar || [])}
-          ${renderBarChart("8. 資產負債概況", [
+          ${renderBarChart("未實現損益分布", gainRows, "TWD")}
+          ${renderBarChart("個股獲利前 5 名", winners, "TWD")}
+          ${renderBarChart("個股虧損前 5 名", losers, "TWD")}
+          ${renderPieChart("現金幣別配置", cashCurrencyShareItems(), "折合台幣", "TWD")}
+          ${renderBarChart("每月定期投入趨勢", monthlyDcaTotals(), "TWD")}
+          ${renderTrendChart("每日未實現損益走勢", data.pnlCalendar || [])}
+          ${renderBarChart("資產負債概況", [
             { label: "總資產", value: Math.max(0, t.total), rawValue: t.total, color: "var(--blue)" },
             { label: "信用卡待繳", value: Math.max(0, t.cards), rawValue: -Math.abs(t.cards), color: "var(--red)" },
             { label: "淨資產", value: Math.max(0, t.total - t.cards), rawValue: t.total - t.cards, color: "var(--green)" }
           ], "TWD")}
+          ${renderTargetSettings()}
         </div>`;
     }
     function legacyDcaCodes() {
@@ -906,7 +1025,7 @@
         </div></article>
         <article class="panel"><div class="panel-pad">
           <h3>幣別匯率設定</h3>
-          <p class="section-note">以 1 單位外幣可折合多少台幣計算；TWD 固定為 1。</p>
+          <p class="section-note">以 1 單位外幣可折合多少台幣計算；TWD 固定為 1。${data.fxRateMeta?.generatedAt ? `最近自動更新：${new Date(data.fxRateMeta.generatedAt).toLocaleString("zh-TW")}｜${data.fxRateMeta.source || "自動匯率"}` : "目前使用手動匯率。"}</p>
           <div class="setting-grid">
             ${currencies.map(code => settingTile(code, textInput(fxRate(code), `fxRates.${code}`, "number"), "TWD / 1 " + code)).join("")}
           </div>
@@ -995,7 +1114,7 @@
     }
     function tradeType(row) {
       const value = String(row.type || row.action || "buy").toLowerCase();
-      return value === "sell" || value.includes("?") ? "sell" : "buy";
+      return value === "sell" || value.includes("賣") ? "sell" : "buy";
     }
     function tradeCurrency(row) {
       return normalizeCurrency(row.currency || (row.market === "US" ? "USD" : "TWD"));
@@ -1058,8 +1177,8 @@
         .sort((a, b) => String(b.row.date || "").localeCompare(String(a.row.date || "")) || b.index - a.index);
       return `${section("purchase", "購買股票紀錄", "可記錄買入與賣出，並依平均成本估算已實現損益。", `<button class="btn green small" data-add="purchaseRecords">+ 新增交易紀錄</button>`)}
         <div class="cards">
-          ${card("累計買入成本", money(summary.totals.buyTwd), "TWD?已折匯率")}
-          ${card("累計賣出金額", money(summary.totals.sellTwd), "TWD?已扣費用稅費")}
+          ${card("累計買入成本", money(summary.totals.buyTwd), "TWD｜已折匯率")}
+          ${card("累計賣出金額", money(summary.totals.sellTwd), "TWD｜已扣費用稅費")}
           ${card("已實現損益", money(summary.totals.realizedTwd), "TWD", "accent")}
           ${card("已實現報酬率", `${rate.toFixed(2)}%`, "以賣出成本計")}
         </div>
@@ -1192,6 +1311,7 @@
         })) },
         dcaTargets: { code: `TARGET${ensureDcaTargets().length + 1}`, name: "" },
         purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
+        dividends: { date: localDateString(), source: "", currency: "TWD", amount: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
         pnlCalendar: makeTodaySnapshot(),
         allocation: { target: "新分配", ratio: 0 }
@@ -1224,6 +1344,19 @@
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
     }
+    function recordAssetSnapshot() {
+      const snapshot = makeAssetSnapshot();
+      const index = data.assetSnapshots.findIndex(row => row.date === snapshot.date);
+      if (index >= 0) {
+        data.assetSnapshots[index] = { ...data.assetSnapshots[index], ...snapshot };
+        toast("已更新今日資產快照");
+      } else {
+        data.assetSnapshots.push(snapshot);
+        toast("已新增今日資產快照");
+      }
+      saveState();
+      render();
+    }
     function wireInputs() {
       document.querySelectorAll("[data-path]").forEach(el => {
         el.addEventListener("input", () => {
@@ -1250,6 +1383,7 @@
       document.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => delPath(el.dataset.del)));
       document.querySelectorAll("[data-add]").forEach(el => el.addEventListener("click", () => addRow(el.dataset.add)));
       document.querySelectorAll("[data-snapshot-pnl]").forEach(el => el.addEventListener("click", recordTodaySnapshot));
+      document.querySelectorAll("[data-asset-snapshot]").forEach(el => el.addEventListener("click", recordAssetSnapshot));
       document.querySelectorAll("[data-calendar-prev]").forEach(el => el.addEventListener("click", () => { calendarMonth = shiftMonth(calendarMonth || localMonthString(), -1); render(); }));
       document.querySelectorAll("[data-calendar-next]").forEach(el => el.addEventListener("click", () => { calendarMonth = shiftMonth(calendarMonth || localMonthString(), 1); render(); }));
     }
@@ -1300,6 +1434,29 @@
       render();
       toast(updated ? `已更新 ${updated} 筆股價` : "沒有找到可套用的股價");
     }
+    function applyLatestRates(payload) {
+      const rates = payload.rates || {};
+      let updated = 0;
+      Object.entries(rates).forEach(([currency, value]) => {
+        const code = normalizeCurrency(currency);
+        const rate = Number(value);
+        if (!code || code === "TWD" || !Number.isFinite(rate) || rate <= 0) return;
+        data.fxRates[code] = rate;
+        if (code === "USD") data.rates.usd = rate;
+        updated += 1;
+      });
+      if (updated) {
+        data.fxRates.TWD = 1;
+        data.fxRateMeta = {
+          generatedAt: payload.generatedAt || new Date().toISOString(),
+          source: payload.source || "自動匯率"
+        };
+        localStorage.setItem(storageKey, JSON.stringify(data));
+        render();
+      }
+      toast(updated ? `已更新 ${updated} 個幣別匯率` : "沒有找到可套用的匯率");
+      return updated;
+    }
     async function autoApplyLatestPrices() {
       if (!location.protocol.startsWith("http")) return;
       try {
@@ -1308,6 +1465,11 @@
         const payload = await response.json();
         if (!payload.prices || !Object.keys(payload.prices).length) return;
         applyLatestPrices(payload);
+        const rateResponse = await fetch(`latest-rates.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!rateResponse.ok) return;
+        const ratePayload = await rateResponse.json();
+        if (!ratePayload.rates || !Object.keys(ratePayload.rates).length) return;
+        applyLatestRates(ratePayload);
       } catch {
         // file:// cannot reliably read sibling JSON; manual import remains available.
       }
@@ -1325,14 +1487,21 @@
         const updateResponse = await fetch("/api/update-prices", { method: "POST" });
         if (!updateResponse.ok) throw new Error(`HTTP ${updateResponse.status}`);
         const result = await updateResponse.json();
-        const priceResponse = await fetch(`latest-prices.json?ts=${Date.now()}`, { cache: "no-store" });
+        const [priceResponse, rateResponse] = await Promise.all([
+          fetch(`latest-prices.json?ts=${Date.now()}`, { cache: "no-store" }),
+          fetch(`latest-rates.json?ts=${Date.now()}`, { cache: "no-store" })
+        ]);
         if (!priceResponse.ok) throw new Error("latest-prices.json not found");
         const payload = await priceResponse.json();
-        if (!payload.prices || !Object.keys(payload.prices).length) {
+        const ratePayload = rateResponse.ok ? await rateResponse.json() : {};
+        const hasPrices = payload.prices && Object.keys(payload.prices).length;
+        const hasRates = ratePayload.rates && Object.keys(ratePayload.rates).length;
+        if (!hasPrices && !hasRates) {
           toast(result.stderr ? "股價更新失敗，請檢查啟動視窗。" : "沒有抓到股價資料");
           return;
         }
-        applyLatestPrices(payload);
+        if (hasPrices) applyLatestPrices(payload);
+        if (hasRates) applyLatestRates(ratePayload);
       } catch {
         toast("無法連線本機更新服務，請改用手動匯入。");
         document.getElementById("priceJson").click();
@@ -1374,7 +1543,12 @@
     document.getElementById("priceJson").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
-      applyLatestPrices(JSON.parse(await file.text()));
+      const payload = JSON.parse(await file.text());
+      if (payload.rates) {
+        applyLatestRates(payload);
+      } else {
+        applyLatestPrices(payload);
+      }
       e.target.value = "";
     });
     document.getElementById("exportJson").addEventListener("click", () => download("personal-assets-demo.json", JSON.stringify(data, null, 2), "application/json"));
