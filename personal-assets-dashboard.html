@@ -370,7 +370,7 @@
       <p class="sub">本檔案使用本機瀏覽器儲存資料，可管理台股、美股、現金、貴金屬、定期投入與支出規畫。</p>
     </section>
 
-    <section class="actions" aria-label="工具列">
+    <section class="actions" aria-label="操作工具">
       <button class="btn purple" id="exportCsv">匯出報表 (CSV)</button>
       <button class="btn blue" id="exportSymbols">匯出代碼清單</button>
       <button class="btn green" id="importPrices">套用最新股價</button>
@@ -381,7 +381,7 @@
       <input type="file" id="priceJson" accept="application/json" hidden>
     </section>
 
-    <nav class="tabs" id="tabs" aria-label="資產分類"></nav>
+    <nav class="tabs" id="tabs" aria-label="資產分頁"></nav>
 
     <section class="view active" id="overview"></section>
     <section class="view" id="tw"></section>
@@ -417,6 +417,7 @@
       silver: [],
       funds: [],
       dca: [],
+      dcaTargets: [],
       purchaseRecords: [],
       budget: [],
       pnlCalendar: [],
@@ -440,7 +441,7 @@
     }
     function persist() {
       localStorage.setItem(storageKey, JSON.stringify(data));
-      toast("已存入瀏覽器本機儲存");
+      toast("資料已儲存在本機瀏覽器");
     }
     function hydrateData(payload) {
       return {
@@ -586,9 +587,84 @@
         };
       });
       return `<div class="chart-pair">
-        ${renderPieChart("每支股票持有比例", valueItems, "持股現值", currency)}
+        ${renderPieChart("每支股票持有比例", valueItems, "持股市值", currency)}
         ${renderPieChart("未實現損益各支股票比例", gainItems, "損益絕對值", currency)}
       </div>`;
+    }
+    function cashBankShareItems() {
+      const grouped = new Map();
+      data.cash
+        .filter(row => normalizeCurrency(row.currency) === "TWD")
+        .forEach(row => {
+          const label = String(row.bank || "未命名銀行").trim() || "未命名銀行";
+          grouped.set(label, (grouped.get(label) || 0) + (Number(row.amount) || 0));
+        });
+      return [...grouped.entries()].map(([label, value]) => ({ label, value }));
+    }
+    function cashCurrencyShareItems() {
+      const grouped = new Map();
+      data.cash.forEach(row => {
+        const currency = normalizeCurrency(row.currency);
+        grouped.set(currency, (grouped.get(currency) || 0) + twdCash(row));
+      });
+      const reserve = Number(data.rates.reserve) || 0;
+      if (reserve > 0) grouped.set("TWD", (grouped.get("TWD") || 0) + reserve);
+      return [...grouped.entries()].map(([label, value]) => ({ label, value }));
+    }
+    function renderCashCharts() {
+      return `<div class="chart-pair">
+        ${renderPieChart("台幣帳戶各銀行持有比例", cashBankShareItems(), "台幣帳戶", "TWD")}
+        ${renderPieChart("台幣與其他外幣持有比例", cashCurrencyShareItems(), "折合台幣", "TWD")}
+      </div>`;
+    }
+    function legacyDcaCodes() {
+      const codes = new Set();
+      (data.dca || []).forEach(row => {
+        Object.keys(row || {}).forEach(key => {
+          if (key !== "month") codes.add(key);
+        });
+      });
+      Object.keys(data.rates || {}).forEach(key => {
+        if (key.startsWith("dca_")) codes.add(key.slice(4));
+      });
+      return [...codes].filter(Boolean);
+    }
+    function ensureDcaTargets() {
+      if (!Array.isArray(data.dcaTargets)) data.dcaTargets = [];
+      if (!data.dcaTargets.length) {
+        const codes = legacyDcaCodes();
+        data.dcaTargets = (codes.length ? codes : ["0050", "00981A", "VOO", "QQQ"]).map(code => ({ code, name: "" }));
+      }
+      data.dcaTargets.forEach((target, index) => {
+        if (!target.code) target.code = `TARGET${index + 1}`;
+        if (target.name == null) target.name = "";
+      });
+      return data.dcaTargets;
+    }
+    function dcaCode(target, index) {
+      return String(target.code || `TARGET${index + 1}`).trim();
+    }
+    function dcaAmount(row, code) {
+      const value = row ? row[code] : 0;
+      if (typeof value === "boolean") return value ? Number(data.rates[`dca_${code}`]) || 1 : 0;
+      return Number(value) || 0;
+    }
+    function renameDcaTarget(index, nextCode) {
+      const targets = ensureDcaTargets();
+      const target = targets[index];
+      if (!target) return;
+      const oldCode = dcaCode(target, index);
+      const newCode = String(nextCode || "").trim() || oldCode;
+      if (oldCode === newCode) return;
+      target.code = newCode;
+      const oldRateKey = `dca_${oldCode}`;
+      const newRateKey = `dca_${newCode}`;
+      if (data.rates[oldRateKey] != null && data.rates[newRateKey] == null) data.rates[newRateKey] = data.rates[oldRateKey];
+      delete data.rates[oldRateKey];
+      (data.dca || []).forEach(row => {
+        if (row[oldCode] != null && row[newCode] == null) row[newCode] = row[oldCode];
+        delete row[oldCode];
+      });
     }
     function renderOverview() {
       const t = allTotals();
@@ -632,12 +708,12 @@
         ${renderStockCharts(rows, currency)}
         <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select id="${kind}Sort"><option value="code">依代號排序</option><option value="gain">依損益排序</option><option value="value">依市值排序</option></select></div>
         <article class="panel"><div class="table-wrap"><table>
-          <thead><tr><th>股票代號</th><th>標的名稱</th><th>持股數</th><th>平均成本</th><th>目前市價</th><th>現值</th><th>未實現損益</th><th>報酬率</th><th>操作</th></tr></thead>
+          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th><th>操作</th></tr></thead>
           <tbody>${rows.map((r, i) => {
             const rowValue = r.shares * r.price;
             const rowCost = r.shares * r.cost;
             const rowGain = rowValue - rowCost;
-            return `<tr><td>${textInput(r.code, `${kind}.${i}.code`)}</td><td>${textInput(r.name, `${kind}.${i}.name`)}</td><td>${textInput(r.shares, `${kind}.${i}.shares`, "number")}</td><td>${textInput(r.cost, `${kind}.${i}.cost`, "number")}</td><td>${textInput(r.price, `${kind}.${i}.price`, "number")}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><button class="icon-btn" data-del="${kind}.${i}">刪</button></td></tr>`;
+            return `<tr><td>${textInput(r.code, `${kind}.${i}.code`)}</td><td>${textInput(r.name, `${kind}.${i}.name`)}</td><td>${textInput(r.shares, `${kind}.${i}.shares`, "number")}</td><td>${textInput(r.cost, `${kind}.${i}.cost`, "number")}</td><td>${textInput(r.price, `${kind}.${i}.price`, "number")}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><button class="icon-btn" data-del="${kind}.${i}">?</button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
       `;
@@ -654,6 +730,7 @@
           ${card("現金類合計", money(bank + reserve), "銀行現金 + 預備金", "dark")}
           ${card("信用卡待繳總額", `NT$${money(reserved)}`, "提醒用，不併入總資產")}
         </div>
+        ${renderCashCharts()}
         <article class="panel"><div class="panel-pad">
           <h3>預備金設定</h3>
           <div class="setting-grid">
@@ -662,7 +739,7 @@
         </div></article>
         <article class="panel"><div class="panel-pad">
           <h3>幣別匯率設定</h3>
-          <p class="section-note">每 1 單位外幣折合台幣金額；TWD 固定為 1。若新增其他幣別，會自動出現在這裡。</p>
+          <p class="section-note">以 1 單位外幣可折合多少台幣計算；TWD 固定為 1。</p>
           <div class="setting-grid">
             ${currencies.map(code => settingTile(code, textInput(fxRate(code), `fxRates.${code}`, "number"), "TWD / 1 " + code)).join("")}
           </div>
@@ -671,7 +748,7 @@
           <thead><tr><th>銀行名稱</th><th>幣別</th><th>匯率</th><th>現金餘額</th><th>折台幣</th><th>操作</th></tr></thead>
           <tbody>${data.cash.map((r, i) => `<tr><td>${textInput(r.bank, `cash.${i}.bank`)}</td><td>${textInput(normalizeCurrency(r.currency), `cash.${i}.currency`)}</td><td>${rateText(fxRate(r.currency))}</td><td>${textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td><button class="icon-btn" data-del="cash.${i}">刪</button></td></tr>`).join("")}</tbody>
         </table></div></article>
-        <article class="panel"><div class="panel-pad">${section("cards", "信用卡款項紀錄", "只記錄各張卡本期待繳總額。", `<button class="btn green small" data-add="cards">+ 新增信用卡款項</button>`)}
+        <article class="panel"><div class="panel-pad">${section("cards", "信用卡款項紀錄", "只記錄信用卡本期待繳總額，提醒用，不併入總資產與銀行現金統計。", `<button class="btn green small" data-add="cards">+ 新增信用卡款項</button>`)}
           <div class="table-wrap"><table><thead><tr><th>信用卡 / 銀行</th><th>本期待繳金額</th><th>繳款期限</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.cards.map((r, i) => `<tr><td>${textInput(r.card, `cards.${i}.card`)}</td><td>${textInput(r.amount, `cards.${i}.amount`, "number")}</td><td>${textInput(r.due, `cards.${i}.due`)}</td><td>${textInput(r.note, `cards.${i}.note`)}</td><td><button class="icon-btn" data-del="cards.${i}">刪</button></td></tr>`).join("")}</tbody></table></div>
         </div></article>
       `;
@@ -684,19 +761,19 @@
       const value = isGold ? totalWeight * data.rates.goldGram : totalWeight * data.rates.silverOz;
       const title = isGold ? "實體黃金" : "實體白銀";
       return `
-        ${section(kind, title, isGold ? "金飾、金條、金幣可混合記錄。" : "白銀以 oz 作為主要計量單位。", `<button class="btn green small" data-add="${kind}">+ 新增${isGold ? "黃金" : "白銀"}紀錄</button>`)}
+        ${section(kind, title, isGold ? "黃金以台錢與公克記錄。" : "白銀以 oz 記錄。", `<button class="btn green small" data-add="${kind}">+ 新增${isGold ? "黃金" : "白銀"}紀錄</button>`)}
         <div class="cards">
           ${card("總庫存重量", isGold ? totalWeight.toFixed(2) : totalWeight.toFixed(2), isGold ? "公克" : "oz")}
           ${card("投入總成本", money(cost), "TWD")}
           ${card("目前估算市值", money(value), "TWD")}
           ${card("未實現損益", money(value - cost), `${cost ? ((value - cost) / cost * 100).toFixed(2) : "0.00"}%`, "accent")}
         </div>
-        ${isGold ? `<article class="panel gold-summary"><div>總庫存重量：<strong>${Math.floor(totalWeight / 37.5)}</strong>兩 <strong>${Math.floor((totalWeight % 37.5) / 3.75)}</strong>錢 <span class="muted">(${totalWeight.toFixed(2)} 公克)</span></div><div>平均買入金價：<strong>${money(cost / Math.max(totalWeight, 1) * 3.75)}</strong>TWD / 錢</div></article>` : ""}
+        ${isGold ? `<article class="panel gold-summary"><div>總庫存重量約 <strong>${Math.floor(totalWeight / 37.5)}</strong>兩 <strong>${Math.floor((totalWeight % 37.5) / 3.75)}</strong>錢 <span class="muted">(${totalWeight.toFixed(2)} 公克)</span></div><div>平均購入金價約 <strong>${money(cost / Math.max(totalWeight, 1) * 3.75)}</strong>TWD / 錢</div></article>` : ""}
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr>${isGold ? "<th>購買日期</th><th>品項</th><th>兩</th><th>錢</th><th>分</th><th>厘</th><th>公克</th><th>金價</th><th>工錢</th><th>總成本</th><th>購買地點</th><th>操作</th>" : "<th>購買日期</th><th>品項名稱</th><th>數量</th><th>單件重量(oz)</th><th>總重量(oz)</th><th>總購買金額</th><th>備註</th><th>操作</th>"}</tr></thead>
           <tbody>${rows.map((r, i) => isGold
-            ? `<tr><td>${textInput(r.date, `gold.${i}.date`)}</td><td>${textInput(r.item, `gold.${i}.item`)}</td><td>${textInput(r.tael, `gold.${i}.tael`, "number")}</td><td>${textInput(r.mace, `gold.${i}.mace`, "number")}</td><td>${textInput(r.candareen, `gold.${i}.candareen`, "number")}</td><td>${textInput(r.li, `gold.${i}.li`, "number")}</td><td>${textInput(r.gram, `gold.${i}.gram`, "number")}</td><td>${textInput(r.gold, `gold.${i}.gold`, "number")}</td><td>${textInput(r.labor, `gold.${i}.labor`, "number")}</td><td>${money(r.gold + r.labor)}</td><td>${textInput(r.place, `gold.${i}.place`)}</td><td><button class="icon-btn" data-del="gold.${i}">刪</button></td></tr>`
-            : `<tr><td>${textInput(r.date, `silver.${i}.date`)}</td><td>${textInput(r.item, `silver.${i}.item`)}</td><td>${textInput(r.qty, `silver.${i}.qty`, "number")}</td><td>${textInput(r.oz, `silver.${i}.oz`, "number")}</td><td>${(r.qty * r.oz).toFixed(2)}</td><td>${textInput(r.cost, `silver.${i}.cost`, "number")}</td><td>${textInput(r.note, `silver.${i}.note`)}</td><td><button class="icon-btn" data-del="silver.${i}">刪</button></td></tr>`
+            ? `<tr><td>${textInput(r.date, `gold.${i}.date`)}</td><td>${textInput(r.item, `gold.${i}.item`)}</td><td>${textInput(r.tael, `gold.${i}.tael`, "number")}</td><td>${textInput(r.mace, `gold.${i}.mace`, "number")}</td><td>${textInput(r.candareen, `gold.${i}.candareen`, "number")}</td><td>${textInput(r.li, `gold.${i}.li`, "number")}</td><td>${textInput(r.gram, `gold.${i}.gram`, "number")}</td><td>${textInput(r.gold, `gold.${i}.gold`, "number")}</td><td>${textInput(r.labor, `gold.${i}.labor`, "number")}</td><td>${money(r.gold + r.labor)}</td><td>${textInput(r.place, `gold.${i}.place`)}</td><td><button class="icon-btn" data-del="gold.${i}">?</button></td></tr>`
+            : `<tr><td>${textInput(r.date, `silver.${i}.date`)}</td><td>${textInput(r.item, `silver.${i}.item`)}</td><td>${textInput(r.qty, `silver.${i}.qty`, "number")}</td><td>${textInput(r.oz, `silver.${i}.oz`, "number")}</td><td>${(r.qty * r.oz).toFixed(2)}</td><td>${textInput(r.cost, `silver.${i}.cost`, "number")}</td><td>${textInput(r.note, `silver.${i}.note`)}</td><td><button class="icon-btn" data-del="silver.${i}">?</button></td></tr>`
           ).join("")}</tbody>
         </table></div></article>
       `;
@@ -704,18 +781,43 @@
     function renderFund() {
       const cost = sum(data.funds, r => r.cost);
       const value = sum(data.funds, r => r.units * r.nav);
-      return `${section("fund", "安聯台灣科技持股總覽", "", `<button class="btn blue small" data-add="funds">+ 補入基金紀錄</button>`)}
+      return `${section("fund", "台幣基金持股總覽", "", `<button class="btn blue small" data-add="funds">+ 新增基金紀錄</button>`)}
         <article class="panel"><div class="panel-pad">
-          <p>總持有單位：<strong class="number" style="display:inline">${money(sum(data.funds, r => r.units))}</strong>｜總投入金額：<strong class="number" style="display:inline">${money(cost)}</strong> TWD｜目前總現值：<strong class="number amber" style="display:inline">${money(value)}</strong> TWD｜未實現損益：<strong class="number gain" style="display:inline">${money(value - cost)}</strong> TWD</p>
+          <p>總持有單位：<strong class="number" style="display:inline">${money(sum(data.funds, r => r.units))}</strong>，總投入成本：<strong class="number" style="display:inline">${money(cost)}</strong> TWD，目前總現值：<strong class="number amber" style="display:inline">${money(value)}</strong> TWD，未實現損益：<strong class="number gain" style="display:inline">${money(value - cost)}</strong> TWD</p>
         </div></article>
-        <article class="panel"><div class="table-wrap"><table><thead><tr><th>基金名稱</th><th>總投入金額</th><th>購入單位數</th><th>目前淨值</th><th>現值</th><th>操作</th></tr></thead><tbody>${data.funds.map((r, i) => `<tr><td>${textInput(r.name, `funds.${i}.name`)}</td><td>${textInput(r.cost, `funds.${i}.cost`, "number")}</td><td>${textInput(r.units, `funds.${i}.units`, "number")}</td><td>${textInput(r.nav, `funds.${i}.nav`, "number")}</td><td>${money(r.units * r.nav)}</td><td><button class="icon-btn" data-del="funds.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+        <article class="panel"><div class="table-wrap"><table><thead><tr><th>基金名稱</th><th>投入成本</th><th>購買單位數</th><th>目前淨值</th><th>現值</th><th>操作</th></tr></thead><tbody>${data.funds.map((r, i) => `<tr><td>${textInput(r.name, `funds.${i}.name`)}</td><td>${textInput(r.cost, `funds.${i}.cost`, "number")}</td><td>${textInput(r.units, `funds.${i}.units`, "number")}</td><td>${textInput(r.nav, `funds.${i}.nav`, "number")}</td><td>${money(r.units * r.nav)}</td><td><button class="icon-btn" data-del="funds.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+    }
+    function renderDcaEditable() {
+      const targets = ensureDcaTargets();
+      const codes = targets.map(dcaCode);
+      const targetRows = targets.map((target, i) => {
+        const code = dcaCode(target, i);
+        return `<tr>
+          <td><input value="${code}" data-dca-code="${i}"></td>
+          <td>${textInput(target.name || "", `dcaTargets.${i}.name`)}</td>
+          <td>${textInput(Number(data.rates[`dca_${code}`]) || 0, `rates.dca_${code}`, "number")}</td>
+          <td><button class="icon-btn" data-del="dcaTargets.${i}">刪</button></td>
+        </tr>`;
+      }).join("");
+      const monthlyRows = data.dca.map((row, i) => {
+        const total = codes.reduce((acc, code) => acc + dcaAmount(row, code), 0);
+        return `<tr>
+          <td>${textInput(row.month, `dca.${i}.month`)}</td>
+          ${codes.map(code => `<td>${textInput(dcaAmount(row, code), `dca.${i}.${code}`, "number")}</td>`).join("")}
+          <td>${money(total)}</td>
+          <td><button class="icon-btn" data-del="dca.${i}">刪</button></td>
+        </tr>`;
+      }).join("");
+      return `${section("dca", "定期定額追蹤", "", `<div class="actions" style="margin:0;padding:0;border:0;background:transparent;min-height:0"><button class="btn green small" data-add="dcaTargets">+ 新增投資標的</button><button class="btn purple small" data-add="dca">+ 新增月份紀錄</button></div>`)}
+        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><p class="section-note">投資標的可自行修改；變更代號時，既有月份紀錄會一起轉移到新代號。</p></div><div class="table-wrap"><table><thead><tr><th>投資標的代號</th><th>標的名稱 / 備註</th><th>預設月扣金額</th><th>操作</th></tr></thead><tbody>${targetRows}</tbody></table></div></article>
+        <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(code => `<th>${code}</th>`).join("")}<th>月扣合計</th><th>操作</th></tr></thead><tbody>${monthlyRows}</tbody></table></div></article>`;
     }
     function renderDca() {
-      const codes = [...new Set(["0050", "00981A", "VOO", "QQQ", ...data.dca.flatMap(row => Object.keys(row).filter(key => key !== "month"))])];
-      return `${section("dca", "定期定額追蹤", "", `<button class="btn purple small" data-add="dca">+ 新增月份紀錄</button>`)}
-        <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><div class="setting-grid">${codes.map(c => settingTile(c, textInput(Number(data.rates[`dca_${c}`]) || 0, `rates.dca_${c}`, "number"), "預設月扣")).join("")}</div></div></article>
-        <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(c => `<th>${c}</th>`).join("")}<th>月扣合計</th><th>操作</th></tr></thead><tbody>${data.dca.map((r, i) => `<tr><td>${textInput(r.month, `dca.${i}.month`)}</td>${codes.map(c => `<td>${textInput(typeof r[c] === "boolean" ? (r[c] ? Number(data.rates[`dca_${c}`]) || 1 : 0) : Number(r[c]) || 0, `dca.${i}.${c}`, "number")}</td>`).join("")}<td>${money(codes.reduce((total, c) => total + (typeof r[c] === "boolean" ? (r[c] ? Number(data.rates[`dca_${c}`]) || 1 : 0) : Number(r[c]) || 0), 0))}</td><td><button class="icon-btn" data-del="dca.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+      return renderDcaEditable();
     }
+
+
+
     function purchaseCost(row) {
       const gross = (Number(row.shares) || 0) * (Number(row.price) || 0);
       const fees = (Number(row.fee) || 0) + (Number(row.tax) || 0);
@@ -726,7 +828,7 @@
     }
     function tradeType(row) {
       const value = String(row.type || row.action || "buy").toLowerCase();
-      return value === "sell" || value.includes("賣") ? "sell" : "buy";
+      return value === "sell" || value.includes("?") ? "sell" : "buy";
     }
     function tradeCurrency(row) {
       return normalizeCurrency(row.currency || (row.market === "US" ? "USD" : "TWD"));
@@ -787,12 +889,12 @@
       const sortedRecords = data.purchaseRecords
         .map((row, index) => ({ row, index }))
         .sort((a, b) => String(b.row.date || "").localeCompare(String(a.row.date || "")) || b.index - a.index);
-      return `${section("purchase", "購買股票紀錄", "記錄買入與賣出股票，並以平均成本法計算已實現損益；此分頁只做紀錄，不會自動改動目前持股。", `<button class="btn green small" data-add="purchaseRecords">+ 新增交易紀錄</button>`)}
+      return `${section("purchase", "購買股票紀錄", "可記錄買入與賣出，並依平均成本估算已實現損益。", `<button class="btn green small" data-add="purchaseRecords">+ 新增交易紀錄</button>`)}
         <div class="cards">
-          ${card("累計買入成本", money(summary.totals.buyTwd), "TWD，依幣別匯率換算")}
-          ${card("累計賣出金額", money(summary.totals.sellTwd), "TWD，已扣除費用稅費")}
+          ${card("累計買入成本", money(summary.totals.buyTwd), "TWD?已折匯率")}
+          ${card("累計賣出金額", money(summary.totals.sellTwd), "TWD?已扣費用稅費")}
           ${card("已實現損益", money(summary.totals.realizedTwd), "TWD", "accent")}
-          ${card("已實現報酬率", `${rate.toFixed(2)}%`, "賣出成本基準")}
+          ${card("已實現報酬率", `${rate.toFixed(2)}%`, "以賣出成本計")}
         </div>
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>備註</th><th>操作</th></tr></thead>
@@ -803,7 +905,7 @@
             return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td>${textInput(r.note || "", `purchaseRecords.${i}.note`)}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
-        <article class="panel"><div class="panel-pad"><h3>個股交易彙總</h3></div><div class="table-wrap"><table>
+        <article class="panel"><div class="panel-pad"><h3>目前持股摘要</h3></div><div class="table-wrap"><table>
           <thead><tr><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>累計買入股數</th><th>累計賣出股數</th><th>剩餘股數</th><th>平均成本</th><th>已實現損益</th></tr></thead>
           <tbody>${summary.positions.map(r => {
             const avg = r.shares ? r.basis / r.shares : 0;
@@ -835,41 +937,41 @@
         const row = byDate[date];
         const prev = rows.filter(r => r.date < date).at(-1);
         const dayDelta = row && prev ? row.totalGain - prev.totalGain : 0;
-        cells.push(`<div class="day-card"><strong>${day}</strong>${row ? `<span class="delta ${dayDelta >= 0 ? "ok" : "gain"}">${dayDelta >= 0 ? "+" : ""}${money(dayDelta)}</span><small>未實現損益 ${money(row.totalGain)}<br>${row.note || ""}</small>` : `<small>尚未記錄</small>`}</div>`);
+        cells.push(`<div class="day-card"><strong>${day}</strong>${row ? `<span class="delta ${dayDelta >= 0 ? "ok" : "gain"}">${dayDelta >= 0 ? "+" : ""}${money(dayDelta)}</span><small>未實現損益：${money(row.totalGain)}<br>${row.note || ""}</small>` : `<small>尚未記錄</small>`}</div>`);
       }
-      return `${section("pnlCalendar", "股票每日未實現損益變動行事曆", "按一下即可用目前台股與美股持股資料記錄今日未實現損益；若今天已有紀錄會直接更新。", `<button class="btn small" data-calendar-prev>‹ 上一月</button><button class="btn small" data-calendar-next>下一月 ›</button><button class="btn blue small" data-snapshot-pnl>一鍵記錄今日快照</button>`)}
+      return `${section("pnlCalendar", "一鍵記錄今日快照", "記錄每日未實現損益變化，方便回看每月波動。", `<button class="btn small" data-calendar-prev>上個月</button><button class="btn small" data-calendar-next>下個月</button><button class="btn blue small" data-snapshot-pnl>一鍵記錄今日快照</button>`)}
         <div class="cards">
           ${card("最新未實現損益", money(latest.totalGain), "TWD", "accent")}
-          ${card("較前次變動", `${delta >= 0 ? "+" : ""}${money(delta)}`, "TWD")}
+          ${card("與前次相比", `${delta >= 0 ? "+" : ""}${money(delta)}`, "TWD")}
           ${card("台股未實現損益", money(latest.twGain || 0), "TWD")}
           ${card("美股未實現損益", money(latest.usGain || 0), "TWD")}
         </div>
-        <article class="panel"><div class="panel-pad"><h3>${month} 損益行事曆</h3><div class="calendar-grid">${cells.join("")}</div></div></article>
+        <article class="panel"><div class="panel-pad"><h3>${month} 每日快照</h3><div class="calendar-grid">${cells.join("")}</div></div></article>
         <article class="panel"><div class="table-wrap"><table>
-          <thead><tr><th>日期</th><th>台股未實現損益</th><th>美股未實現損益</th><th>股票未實現損益合計</th><th>較前筆變動</th><th>備註</th><th>操作</th></tr></thead>
+          <thead><tr><th>日期</th><th>台股未實現損益</th><th>美股未實現損益</th><th>總未實現損益</th><th>與前次差異</th><th>備註</th><th>操作</th></tr></thead>
           <tbody>${rows.map((r) => {
             const i = data.pnlCalendar.indexOf(r);
             const prev = rows.filter(item => item.date < r.date).at(-1);
             const rowDelta = prev ? r.totalGain - prev.totalGain : 0;
-            return `<tr><td>${textInput(r.date, `pnlCalendar.${i}.date`)}</td><td>${textInput(r.twGain, `pnlCalendar.${i}.twGain`, "number")}</td><td>${textInput(r.usGain, `pnlCalendar.${i}.usGain`, "number")}</td><td>${textInput(r.totalGain, `pnlCalendar.${i}.totalGain`, "number")}</td><td class="${rowDelta >= 0 ? "ok" : "gain"}">${rowDelta >= 0 ? "+" : ""}${money(rowDelta)}</td><td>${textInput(r.note, `pnlCalendar.${i}.note`)}</td><td><button class="icon-btn" data-del="pnlCalendar.${i}">刪</button></td></tr>`;
+            return `<tr><td>${textInput(r.date, `pnlCalendar.${i}.date`)}</td><td>${textInput(r.twGain, `pnlCalendar.${i}.twGain`, "number")}</td><td>${textInput(r.usGain, `pnlCalendar.${i}.usGain`, "number")}</td><td>${textInput(r.totalGain, `pnlCalendar.${i}.totalGain`, "number")}</td><td class="${rowDelta >= 0 ? "ok" : "gain"}">${rowDelta >= 0 ? "+" : ""}${money(rowDelta)}</td><td>${textInput(r.note, `pnlCalendar.${i}.note`)}</td><td><button class="icon-btn" data-del="pnlCalendar.${i}">??/button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>`;
     }
     function renderGeneric(key, title) {
       if (key === "expense") {
-        return `${section(key, title, "月支出、年度支出與待處理款項。", `<button class="btn green small" data-add="budget">+ 新增支出</button>`)}
+        return `${section(key, title, "規畫固定或週期性支出。", `<button class="btn green small" data-add="budget">+ 新增支出</button>`)}
           <article class="panel"><div class="table-wrap"><table><thead><tr><th>項目</th><th>金額</th><th>週期</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.budget.map((r, i) => `<tr><td>${textInput(r.item, `budget.${i}.item`)}</td><td>${textInput(r.amount, `budget.${i}.amount`, "number")}</td><td>${textInput(r.cycle, `budget.${i}.cycle`)}</td><td>${textInput(r.note, `budget.${i}.note`)}</td><td><button class="icon-btn" data-del="budget.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
       }
       if (key === "allocation") {
-        return `${section(key, title, "規畫新增資金分配比例。", `<button class="btn green small" data-add="allocation">+ 新增分配項目</button>`)}
-          <article class="panel"><div class="table-wrap"><table><thead><tr><th>目標</th><th>分配比例</th><th>每 100,000 元分配金額</th><th>操作</th></tr></thead><tbody>${data.allocation.map((r, i) => `<tr><td>${textInput(r.target, `allocation.${i}.target`)}</td><td>${textInput(r.ratio, `allocation.${i}.ratio`, "number")}%</td><td>${money(r.ratio * 1000)}</td><td><button class="icon-btn" data-del="allocation.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
+        return `${section(key, title, "規畫額外資金的分配比例。", `<button class="btn green small" data-add="allocation">+ 新增分配項目</button>`)}
+          <article class="panel"><div class="table-wrap"><table><thead><tr><th>目標</th><th>分配比例</th><th>每 100,000 預估金額</th><th>操作</th></tr></thead><tbody>${data.allocation.map((r, i) => `<tr><td>${textInput(r.target, `allocation.${i}.target`)}</td><td>${textInput(r.ratio, `allocation.${i}.ratio`, "number")}%</td><td>${money(r.ratio * 1000)}</td><td><button class="icon-btn" data-del="allocation.${i}">刪</button></td></tr>`).join("")}</tbody></table></div></article>`;
       }
       const t = allTotals();
       const twRatio = t.total ? (t.tw / t.total * 100).toFixed(1) : "0.0";
       const usRatio = t.total ? (t.us / t.total * 100).toFixed(1) : "0.0";
-      return `${section(key, title, "此分頁已保留為可擴充工作區。")}
+      return `${section(key, title, "目前提供資產總覽卡片。")}
         <div class="cards">${card("目前淨資產", money(t.total), "TWD", "dark")}${card("可投入現金", money(t.cash - t.cards), "TWD")}${card("台股比重", `${twRatio}%`, "目前配置")}${card("美股比重", `${usRatio}%`, "目前配置")}</div>
-        <div class="notice">可在這裡接上你的 Notion、Google Sheet 或現有 Python 建置流程，將示範資料替換成實際資料。</div>`;
+        <div class="notice">此區可作為後續圖表與資料檢視擴充區。</div>`;
     }
     function render() {
       renderTabs();
@@ -881,7 +983,7 @@
       document.getElementById("gold").innerHTML = renderMetals("gold");
       document.getElementById("silver").innerHTML = renderMetals("silver");
       document.getElementById("fund").innerHTML = renderFund();
-      document.getElementById("dca").innerHTML = renderDca();
+      document.getElementById("dca").innerHTML = renderDcaEditable();
       document.getElementById("purchase").innerHTML = renderPurchaseRecords();
       document.getElementById("expense").innerHTML = renderGeneric("expense", "支出規畫");
       document.getElementById("allocation").innerHTML = renderGeneric("allocation", "額外資金分配");
@@ -896,6 +998,14 @@
     }
     function delPath(path) {
       const [key, index] = path.split(".");
+      if (key === "dcaTargets") {
+        const target = ensureDcaTargets()[Number(index)];
+        const code = target ? dcaCode(target, Number(index)) : "";
+        if (code) {
+          delete data.rates[`dca_${code}`];
+          (data.dca || []).forEach(row => delete row[code]);
+        }
+      }
       data[key].splice(Number(index), 1);
       render();
     }
@@ -908,11 +1018,15 @@
         gold: { date: "2026-07-06", item: "新黃金", tael: 0, mace: 0, candareen: 0, li: 0, gram: 0, gold: 0, labor: 0, place: "" },
         silver: { date: "2026-07-06", item: "新白銀", qty: 0, oz: 1, cost: 0, note: "" },
         funds: { name: "新基金", units: 0, cost: 0, nav: 0 },
-        dca: { month: "2026.08", "0050": Number(data.rates.dca_0050) || 0, "00981A": Number(data.rates.dca_00981A) || 0, VOO: Number(data.rates.dca_VOO) || 0, QQQ: Number(data.rates.dca_QQQ) || 0 },
+        dca: { month: localMonthString().replace("-", "."), ...Object.fromEntries(ensureDcaTargets().map((target, index) => {
+          const code = dcaCode(target, index);
+          return [code, Number(data.rates[`dca_${code}`]) || 0];
+        })) },
+        dcaTargets: { code: `TARGET${ensureDcaTargets().length + 1}`, name: "" },
         purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
         pnlCalendar: makeTodaySnapshot(),
-        allocation: { target: "新目標", ratio: 0 }
+        allocation: { target: "新分配", ratio: 0 }
       };
       data[key].push(defaults[key]);
       render();
@@ -924,7 +1038,7 @@
         twGain: Math.round(gain.twGain),
         usGain: Math.round(gain.usGain),
         totalGain: Math.round(gain.twGain + gain.usGain),
-        note: "一鍵快照：依目前台股與美股持股價格自動記錄"
+        note: "一鍵快照"
       };
     }
     function recordTodaySnapshot() {
@@ -932,10 +1046,10 @@
       const index = data.pnlCalendar.findIndex(row => row.date === snapshot.date);
       if (index >= 0) {
         data.pnlCalendar[index] = { ...data.pnlCalendar[index], ...snapshot };
-        toast("已更新今日損益快照");
+        toast("已更新今日快照");
       } else {
         data.pnlCalendar.push(snapshot);
-        toast("已新增今日損益快照");
+        toast("已新增今日快照");
       }
       calendarMonth = snapshot.date.slice(0, 7);
       localStorage.setItem(storageKey, JSON.stringify(data));
@@ -947,6 +1061,12 @@
           let value = el.type === "checkbox" ? el.checked : el.value;
           if (el.type === "number") value = Number(value);
           setPath(el.dataset.path, value);
+          render();
+        });
+      });
+      document.querySelectorAll("[data-dca-code]").forEach(el => {
+        el.addEventListener("change", () => {
+          renameDcaTarget(Number(el.dataset.dcaCode), el.value);
           render();
         });
       });
@@ -964,7 +1084,7 @@
       URL.revokeObjectURL(a.href);
     }
     function exportCsv() {
-      const rows = [["分類", "代號/項目", "名稱", "數量", "成本", "現價/金額", "現值"]];
+      const rows = [["類別", "代號/項目", "名稱", "數量", "成本", "現價/金額", "現值"]];
       data.tw.forEach(r => rows.push(["台股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
       data.us.forEach(r => rows.push(["美股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
       data.cash.forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
@@ -972,7 +1092,7 @@
       data.silver.forEach(r => rows.push(["白銀", "", r.item, r.qty * r.oz, r.cost, data.rates.silverOz, r.qty * r.oz * data.rates.silverOz]));
       const tradeSummary = buildTradeSummary();
       data.purchaseRecords.forEach((r, i) => rows.push(["股票交易紀錄", r.code, `${r.date} ${tradeType(r) === "sell" ? "賣出" : "買入"} ${r.market} ${r.name}`, r.shares, purchaseCost(r), r.price, tradeSummary.realizedByIndex.get(i) ?? ""]));
-      data.pnlCalendar.forEach(r => rows.push(["損益行事曆", r.date, r.note, "", r.twGain, r.usGain, r.totalGain]));
+      data.pnlCalendar.forEach(r => rows.push(["損益快照", r.date, r.note, "", r.twGain, r.usGain, r.totalGain]));
       download("personal-assets-demo.csv", rows.map(r => r.map(v => `"${String(v).replaceAll('"', '""')}"`).join(",")).join("\n"), "text/csv;charset=utf-8");
     }
     function exportSymbols() {
@@ -1001,7 +1121,7 @@
       updateRows(data.us, "US");
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
-      toast(updated ? `已更新 ${updated} 檔最新股價` : "沒有找到可套用的股價");
+      toast(updated ? `已更新 ${updated} 筆股價` : "沒有找到可套用的股價");
     }
     async function autoApplyLatestPrices() {
       if (!location.protocol.startsWith("http")) return;
@@ -1032,12 +1152,12 @@
         if (!priceResponse.ok) throw new Error("latest-prices.json not found");
         const payload = await priceResponse.json();
         if (!payload.prices || !Object.keys(payload.prices).length) {
-          toast(result.stderr ? "股價更新失敗，請確認網路權限" : "沒有可套用的最新股價");
+          toast(result.stderr ? "股價更新失敗，請檢查啟動視窗。" : "沒有抓到股價資料");
           return;
         }
         applyLatestPrices(payload);
       } catch {
-        toast("本機更新服務不可用，請改用手動匯入");
+        toast("無法連線本機更新服務，請改用手動匯入。");
         document.getElementById("priceJson").click();
       } finally {
         button.disabled = false;
@@ -1065,10 +1185,10 @@
       const payload = JSON.parse(await file.text());
       if (payload.kind === "personal-assets-purchase-records") {
         const added = mergePurchaseRecords(payload.purchaseRecords || []);
-        toast(`已匯入 ${added} 筆股票交易紀錄，重複資料已略過`);
+        toast(`已匯入 ${added} 筆交易紀錄，重複資料已略過`);
       } else {
         data = hydrateData(payload);
-        toast("已還原完整儀表板資料");
+        toast("已匯入完整存檔");
       }
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
@@ -1085,7 +1205,7 @@
     document.getElementById("exportSymbols").addEventListener("click", exportSymbols);
     document.getElementById("importPrices").addEventListener("click", updatePricesFromServer);
     document.getElementById("resetData").addEventListener("click", () => {
-      if (confirm("要重設為展示資料嗎？")) {
+      if (confirm("確定要清除目前所有資料嗎？")) {
         data = structuredClone(seed);
         persist();
         render();
