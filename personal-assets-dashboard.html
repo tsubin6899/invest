@@ -993,6 +993,7 @@
     <section class="actions" aria-label="操作工具">
       <button class="btn purple" id="exportCsv">匯出報表 (CSV)</button>
       <button class="btn green" id="saveData">匯入存檔</button>
+      <button class="btn blue" id="importPrices">更新股價與匯率</button>
       <button class="btn blue" id="exportJson">匯出存檔 (JSON)</button>
       <button class="btn dark" id="resetData">清空資料</button>
       <input type="file" id="importJson" accept="application/json" hidden>
@@ -2535,6 +2536,7 @@
     });
     document.getElementById("exportJson").addEventListener("click", () => download("personal-assets-demo.json", JSON.stringify(data, null, 2), "application/json"));
     document.getElementById("exportCsv").addEventListener("click", exportCsv);
+    document.getElementById("importPrices").addEventListener("click", updatePricesFromServer);
     document.getElementById("resetData").addEventListener("click", () => {
       if (confirm("確定要清除目前所有資料嗎？")) {
         data = structuredClone(seed);
