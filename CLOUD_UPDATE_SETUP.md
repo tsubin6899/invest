@@ -13,15 +13,14 @@ It runs on weekdays at 13:30 Taipei time and can also be triggered manually or b
 
 ## Web button trigger
 
-Deploy this folder to Netlify if you want the in-page button to trigger GitHub Actions safely.
+Deploy this folder to Vercel if you want the in-page button to trigger GitHub Actions safely.
 
-Set these Netlify environment variables:
+Set these Vercel environment variables:
 
 - `GITHUB_TOKEN`: a fine-grained GitHub token with Actions write access for this repository
 - `GITHUB_OWNER`: repository owner, for example `tsubin6899`
 - `GITHUB_REPO`: repository name
 - `GITHUB_REF`: branch name, usually `main`
 - `GITHUB_WORKFLOW`: optional, defaults to `update-market-data.yml`
-- `ALLOWED_ORIGIN`: optional, your site URL
 
-The dashboard calls `/.netlify/functions/trigger-price-update`. The token stays in Netlify and is never exposed in the browser.
+The dashboard calls `/api/trigger-price-update`. The token stays in Vercel and is never exposed in the browser.
