@@ -576,12 +576,34 @@
         gap: 8px;
         margin-top: 10px;
       }
+      .fx-rate-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
       .setting-tile {
         min-height: 78px;
         padding: 10px;
         border-radius: 10px;
       }
       .setting-tile input { min-height: 31px; font-size: 13px; }
+      .fx-rate-grid .setting-tile {
+        min-height: 92px;
+        padding: 9px 7px;
+      }
+      .fx-rate-grid .setting-tile .label {
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+      .fx-rate-grid .setting-tile input {
+        min-height: 30px;
+        padding: 5px 6px;
+        border-radius: 7px;
+        font-size: 12px;
+      }
+      .fx-rate-grid .setting-tile .unit {
+        margin-top: 6px;
+        font-size: 10px;
+        line-height: 1.25;
+      }
       .gold-summary {
         padding: 14px 12px;
         font-size: 13px;
@@ -2280,7 +2302,7 @@
         <article class="panel"><div class="panel-pad">
           <h3>幣別匯率設定</h3>
           <p class="section-note">以 1 單位外幣可折合多少台幣計算；TWD 固定為 1。${data.fxRateMeta?.generatedAt ? `最近自動更新：${new Date(data.fxRateMeta.generatedAt).toLocaleString("zh-TW")}｜${data.fxRateMeta.source || "自動匯率"}` : "目前使用手動匯率。"}</p>
-          <div class="setting-grid">
+          <div class="setting-grid fx-rate-grid">
             ${currencies.map(code => settingTile(code, textInput(fxRate(code), `fxRates.${code}`, "number"), "TWD / 1 " + code)).join("")}
           </div>
         </div></article>
