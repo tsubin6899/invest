@@ -2514,6 +2514,13 @@
     function renderPurchaseRecords() {
       const summary = buildTradeSummary();
       const rate = summary.totals.soldBasisTwd ? summary.totals.realizedTwd / summary.totals.soldBasisTwd * 100 : 0;
+      const sortedPositions = [...summary.positions].sort((a, b) => {
+        const aOpen = Number(a.shares) > 0 ? 1 : 0;
+        const bOpen = Number(b.shares) > 0 ? 1 : 0;
+        return bOpen - aOpen
+          || String(a.market || "").localeCompare(String(b.market || ""))
+          || String(a.code || "").localeCompare(String(b.code || ""));
+      });
       const sortedRecords = data.purchaseRecords
         .map((row, index) => ({ row, index }))
         .sort((a, b) => String(b.row.date || "").localeCompare(String(a.row.date || "")) || b.index - a.index);
@@ -2536,7 +2543,7 @@
         </table></div></article>
         <article class="panel"><div class="panel-pad"><h3>目前持股摘要</h3></div><div class="table-wrap"><table>
           <thead><tr><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>累計買入股數</th><th>累計賣出股數</th><th>剩餘股數</th><th>平均成本</th><th>已實現損益</th></tr></thead>
-          <tbody>${summary.positions.map(r => {
+          <tbody>${sortedPositions.map(r => {
             const avg = r.shares ? r.basis / r.shares : 0;
             return `<tr><td>${r.market}</td><td>${r.currency}</td><td>${r.code}</td><td>${r.name}</td><td>${money(r.bought, "")}</td><td>${money(r.sold, "")}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(avg, r.currency, 2)}</td><td class="${r.realized >= 0 ? "ok" : "gain"}">${money(r.realized, r.currency)}</td></tr>`;
           }).join("")}</tbody>
@@ -2550,6 +2557,7 @@
     }
     function renderPnlCalendar() {
       const rows = [...data.pnlCalendar].sort((a, b) => a.date.localeCompare(b.date));
+      const tableRows = [...rows].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
       const latest = rows.at(-1) || { totalGain: 0 };
       const previous = rows.at(-2) || { totalGain: latest.totalGain };
       const delta = latest.totalGain - previous.totalGain;
@@ -2578,7 +2586,7 @@
         <article class="panel"><div class="panel-pad"><h3>${month} 每日快照</h3><div class="calendar-grid">${cells.join("")}</div></div></article>
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr><th>日期</th><th>台股未實現損益</th><th>美股未實現損益</th><th>總未實現損益</th><th>與前次差異</th><th>備註</th><th>操作</th></tr></thead>
-          <tbody>${rows.map((r) => {
+          <tbody>${tableRows.map((r) => {
             const i = data.pnlCalendar.indexOf(r);
             const prev = rows.filter(item => item.date < r.date).at(-1);
             const rowDelta = prev ? r.totalGain - prev.totalGain : 0;
