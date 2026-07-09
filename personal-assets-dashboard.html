@@ -1044,6 +1044,23 @@
       }
       .app-header .actions::-webkit-scrollbar { display: none; }
     }
+    .purchase-record-table th:nth-child(4),
+    .purchase-record-table td:nth-child(4) {
+      width: 86px;
+      min-width: 86px;
+      max-width: 86px;
+    }
+    .purchase-record-table th:nth-child(5),
+    .purchase-record-table td:nth-child(5) {
+      width: 116px;
+      min-width: 116px;
+      max-width: 116px;
+    }
+    .purchase-record-table td:nth-child(4) input,
+    .purchase-record-table td:nth-child(5) input {
+      width: 100%;
+      min-width: 0;
+    }
     @media (max-width: 720px) {
       .app-header {
         top: 0;
@@ -2241,7 +2258,7 @@
           ${card("已實現報酬率", `${rate.toFixed(2)}%`, "以賣出成本計")}
         </div>
         ${renderPurchaseAnalysisCharts(summary)}
-        <article class="panel"><div class="table-wrap"><table>
+        <article class="panel"><div class="table-wrap"><table class="purchase-record-table">
           <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>備註</th><th>操作</th></tr></thead>
           <tbody>${sortedRecords.map(({ row: r, index: i }) => {
             const type = tradeType(r);
