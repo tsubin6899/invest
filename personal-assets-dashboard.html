@@ -1141,29 +1141,29 @@
     }
     .purchase-record-table th:nth-child(6),
     .purchase-record-table td:nth-child(6) {
-      width: 142px;
-      min-width: 142px;
-      max-width: 142px;
+      width: 190px;
+      min-width: 190px;
+      max-width: 190px;
     }
     .purchase-record-table th:nth-child(7),
     .purchase-record-table td:nth-child(7) {
-      width: 88px;
-      min-width: 88px;
-      max-width: 88px;
+      width: 110px;
+      min-width: 110px;
+      max-width: 110px;
     }
     .purchase-record-table th:nth-child(8),
     .purchase-record-table td:nth-child(8) {
-      width: 82px;
-      min-width: 82px;
-      max-width: 82px;
+      width: 102px;
+      min-width: 102px;
+      max-width: 102px;
     }
     .purchase-record-table th:nth-child(9),
     .purchase-record-table td:nth-child(9),
     .purchase-record-table th:nth-child(10),
     .purchase-record-table td:nth-child(10) {
-      width: 72px;
-      min-width: 72px;
-      max-width: 72px;
+      width: 88px;
+      min-width: 88px;
+      max-width: 88px;
     }
     .purchase-record-table th:nth-child(6),
     .purchase-record-table td:nth-child(6),
@@ -2526,12 +2526,12 @@
         </div>
         ${renderPurchaseAnalysisCharts(summary)}
         <article class="panel"><div class="table-wrap"><table class="purchase-record-table">
-          <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>備註</th><th>操作</th></tr></thead>
+          <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>操作</th></tr></thead>
           <tbody>${sortedRecords.map(({ row: r, index: i }) => {
             const type = tradeType(r);
             const realized = summary.realizedByIndex.get(i);
             const cashFlow = type === "sell" ? purchaseCost(r) : -purchaseCost(r);
-            return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td>${textInput(r.note || "", `purchaseRecords.${i}.note`)}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
+            return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
         <article class="panel"><div class="panel-pad"><h3>目前持股摘要</h3></div><div class="table-wrap"><table>
