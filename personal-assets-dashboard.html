@@ -470,9 +470,13 @@
       }
       .section-head {
         align-items: flex-start;
-        flex-direction: column;
+        flex-direction: row;
+        flex-wrap: wrap;
         gap: 9px;
         margin-bottom: 12px;
+      }
+      .section-head > div:first-child {
+        flex: 1 0 100%;
       }
       .view > .section-head:not(:first-child) {
         margin-top: 26px;
@@ -588,16 +592,18 @@
         margin: 0 4px;
       }
       .calendar-grid {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 8px;
         margin-top: 10px;
       }
       .day-card {
-        min-height: 86px;
-        padding: 10px;
+        min-height: 78px;
+        padding: 9px;
         border-radius: 10px;
       }
-      .day-card .delta { font-size: 16px; }
+      .day-card strong { font-size: 13px; }
+      .day-card .delta { font-size: 14px; }
+      .day-card small { font-size: 11px; line-height: 1.35; }
       .notice { margin-top: 10px; padding: 11px 12px; font-size: 12px; }
       .icon-btn {
         width: 30px;
