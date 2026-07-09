@@ -3,106 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>個人資產儀表板｜阿斌Tsubin</title>
+  <title>個人資產儀表板｜阿斌 Tsubin</title>
   <meta name="theme-color" content="#101c34">
-  <meta name="application-name" content="阿斌資產儀表板">
-  <meta name="apple-mobile-web-app-title" content="阿斌資產儀表板">
+  <meta name="application-name" content="個人資產儀表板">
+  <meta name="apple-mobile-web-app-title" content="個人資產儀表板">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
-  <style>
-    :root {
-      --bg: #f4f8fb;
-      --ink: #142033;
-      --muted: #667485;
-      --line: #dfe6ee;
-      --surface: #ffffff;
-      --blue: #2368d8;
-      --shadow: 0 14px 34px rgba(21, 32, 49, .08);
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
-      -webkit-text-size-adjust: 100%;
-      overscroll-behavior-y: none;
-    }
-    .shell {
-      width: min(1500px, calc(100vw - 28px));
-      margin: 14px auto 28px;
-      padding: 20px;
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      background: rgba(255,255,255,.86);
-      box-shadow: var(--shadow);
-    }
-    .frame-panel {
-      overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: var(--surface);
-      box-shadow: 0 10px 26px rgba(21,32,49,.05);
-    }
-    iframe {
-      display: block;
-      width: 100%;
-      min-height: 100vh;
-      border: 0;
-      background: #fff;
-    }
-    @media (max-width: 720px) {
-      body { background: #eef4f8; }
-      .shell {
-        width: 100%;
-        margin: 0;
-        padding: 0;
-        border: 0;
-        border-radius: 0;
-        box-shadow: none;
-        background: transparent;
-      }
-      .frame-panel {
-        border: 0;
-        border-radius: 0;
-        box-shadow: none;
-        background: transparent;
-      }
-      iframe { min-height: 100dvh; }
-    }
-  </style>
+  <meta http-equiv="refresh" content="0; url=personal-assets-dashboard.html">
 </head>
 <body>
-  <main class="shell">
-    <article class="frame-panel">
-      <iframe id="assetFrame" src="personal-assets-dashboard.html" title="個人資產儀表板" scrolling="no"></iframe>
-    </article>
-  </main>
-  <script>
-    const frame = document.getElementById("assetFrame");
-    function resizeFrame() {
-      try {
-        const doc = frame.contentDocument || frame.contentWindow.document;
-        const height = Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
-        frame.style.height = `${height}px`;
-      } catch {
-        frame.style.height = "1800px";
-      }
-    }
-    frame.addEventListener("load", () => {
-      resizeFrame();
-      frame.contentWindow?.addEventListener("resize", resizeFrame);
-      setInterval(resizeFrame, 600);
-    });
-    window.addEventListener("resize", resizeFrame);
-    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker.register("service-worker.js").catch(() => {});
-      });
-    }
-  </script>
+  <script>location.replace("personal-assets-dashboard.html");</script>
+  <p><a href="personal-assets-dashboard.html">開啟個人資產儀表板</a></p>
 </body>
 </html>

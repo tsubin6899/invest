@@ -3,7 +3,7 @@
   "short_name": "資產儀表板",
   "description": "管理台股、美股、現金、貴金屬、基金、定期投入與交易紀錄。",
   "lang": "zh-Hant-TW",
-  "start_url": "./index.html",
+  "start_url": "./personal-assets-dashboard.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
