@@ -1,0 +1,13 @@
+[build]
+  publish = "."
+  functions = "netlify/functions"
+
+[[headers]]
+  for = "/latest-prices.json"
+  [headers.values]
+    Cache-Control = "no-store"
+
+[[headers]]
+  for = "/latest-rates.json"
+  [headers.values]
+    Cache-Control = "no-store"
