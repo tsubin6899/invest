@@ -777,24 +777,27 @@
       .sub { margin-top: 5px; font-size: 11px; }
       .top-actions {
         display: flex;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        gap: 8px;
-      }
-      .top-actions > .cloud-sync, .top-actions > .file-actions {
-        width: 100%;
-        max-width: 100%;
         flex-wrap: nowrap;
         justify-content: flex-start;
+        gap: 8px;
         overflow-x: auto;
         overflow-y: hidden;
+        padding-bottom: 2px;
         -webkit-overflow-scrolling: touch;
         scrollbar-width: none;
         touch-action: pan-x;
         overscroll-behavior-x: contain;
       }
+      .top-actions > .cloud-sync, .top-actions > .file-actions {
+        width: max-content;
+        max-width: none;
+        flex: 0 0 auto;
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow: visible;
+      }
       .file-actions > .btn { min-width: 0; }
-      .cloud-sync::-webkit-scrollbar, .file-actions::-webkit-scrollbar { display: none; }
+      .top-actions::-webkit-scrollbar { display: none; }
       .top-actions .btn {
         min-height: 34px;
         padding: 0 12px;
