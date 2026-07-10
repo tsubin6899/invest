@@ -133,11 +133,15 @@
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-end;
-      gap: 7px;
+      gap: 6px;
+      padding: 6px;
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 10px;
+      background: rgba(255,255,255,.04);
     }
     .btn {
-      min-height: 36px;
-      padding: 0 12px;
+      min-height: 32px;
+      padding: 6px 11px;
       border: 0;
       border-radius: 8px;
       color: #fff;
@@ -148,6 +152,8 @@
       display: inline-grid;
       place-items: center;
       box-shadow: 0 8px 20px rgba(22,32,51,.14);
+      font-size: 13px;
+      white-space: nowrap;
     }
     .btn.green { background: var(--green); }
     .btn.purple { background: var(--purple); }
@@ -163,8 +169,8 @@
       font-size: 13px;
     }
     .cloud-email {
-      width: 180px;
-      min-height: 36px;
+      width: 170px;
+      min-height: 32px;
       border-color: rgba(255,255,255,.2);
       color: #fffdf8;
       background: rgba(255,255,255,.08);
@@ -173,7 +179,7 @@
     .cloud-status {
       display: inline-grid;
       place-items: center;
-      min-height: 36px;
+      min-height: 32px;
       color: rgba(255,253,248,.72);
       font-size: 12px;
       white-space: nowrap;
@@ -716,10 +722,10 @@
       }
       .top-actions::-webkit-scrollbar { display: none; }
       .top-actions .btn {
-        min-height: 34px;
-        padding: 0 11px;
+        min-height: 32px;
+        padding: 6px 10px;
         border-radius: 8px;
-        font-size: 13px;
+        font-size: 12px;
         white-space: nowrap;
       }
       .cloud-email { width: 170px; min-width: 170px; }
@@ -1144,6 +1150,12 @@
     const itemSelect = document.getElementById("item");
     const itemCategorySelect = document.getElementById("itemCategory");
     const accountSelect = document.getElementById("account");
+    const accountTypeLabel = document.createElement("label");
+    accountTypeLabel.textContent = "帳戶類型";
+    const accountTypeSelect = document.createElement("select");
+    accountTypeSelect.id = "accountType";
+    accountTypeLabel.appendChild(accountTypeSelect);
+    accountSelect.closest("label")?.before(accountTypeLabel);
     const transferForm = document.getElementById("transferForm");
     const transferFromSelect = document.getElementById("transferFrom");
     const transferToSelect = document.getElementById("transferTo");
