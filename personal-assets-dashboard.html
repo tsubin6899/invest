@@ -1668,6 +1668,18 @@
         return;
       }
       const payload = hydrateData(data);
+      const localAccounting = loadAccountingLedger();
+      const { data: existingRow } = await supabaseClient
+        .from(cloudTable)
+        .select("data")
+        .eq("user_id", cloudUser.id)
+        .maybeSingle();
+      const hasLocalAccounting = Boolean(
+        localAccounting.entries.length ||
+        (localAccounting.transfers || []).length ||
+        (localAccounting.creditBills || []).length
+      );
+      payload.accountingLedger = hasLocalAccounting ? localAccounting : existingRow?.data?.accountingLedger;
       const { error } = await supabaseClient
         .from(cloudTable)
         .upsert({ user_id: cloudUser.id, data: payload }, { onConflict: "user_id" });
@@ -1698,6 +1710,9 @@
         return;
       }
       data = hydrateData(row.data);
+      if (row.data.accountingLedger) {
+        localStorage.setItem(accountingStorageKey, JSON.stringify(row.data.accountingLedger));
+      }
       saveState();
       markMeta("lastCloudLoadAt");
       render();
@@ -1785,9 +1800,14 @@
     function loadAccountingLedger() {
       try {
         const saved = JSON.parse(localStorage.getItem(accountingStorageKey) || "{}");
-        return { entries: Array.isArray(saved.entries) ? saved.entries : [] };
+        return {
+          ...saved,
+          entries: Array.isArray(saved.entries) ? saved.entries : [],
+          transfers: Array.isArray(saved.transfers) ? saved.transfers : [],
+          creditBills: Array.isArray(saved.creditBills) ? saved.creditBills : []
+        };
       } catch {
-        return { entries: [] };
+        return { entries: [], transfers: [], creditBills: [] };
       }
     }
     function accountingRows(month = localMonthString()) {
@@ -2912,7 +2932,6 @@
       const balance = income - expense;
       const expenseGroups = accountingGroup(rows, "category", "expense");
       const itemGroups = accountingGroup(rows, "item", "expense").filter(row => row.label !== "未分類");
-      const methodGroups = accountingGroup(rows, "method");
       const topExpense = expenseGroups[0];
       const recent = rows.slice(0, 8);
       const empty = !rows.length ? `<div class="notice">目前尚無本月記帳資料。請先開啟獨立記帳 App 新增收入或支出，這裡會自動讀取同一份資料。</div>` : "";
@@ -2927,11 +2946,10 @@
         <div class="chart-grid">
           ${renderBarChart("本月支出分類排行", expenseGroups.slice(0, 8), "TWD")}
           ${renderBarChart("本月支出項目排行", itemGroups.slice(0, 8), "TWD")}
-          ${renderPieChart("本月付款方式占比", methodGroups, "收支金額", "TWD")}
         </div>
         <article class="panel"><div class="panel-pad"><h3>近期記帳明細</h3><p class="section-note">最新資料排在最上方；新增與刪除請到獨立記帳 App 操作。</p></div>
-          <div class="table-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>帳戶</th><th>方式</th><th>商家 / 對象</th></tr></thead>
-          <tbody>${recent.map(row => `<tr><td>${row.date || ""}</td><td>${row.type === "income" ? "收入" : "支出"}</td><td>${row.category || "-"}</td><td>${row.item || "-"}</td><td class="accounting-amount ${row.type === "income" ? "ok" : "gain"}">${row.type === "income" ? "+" : "-"}${money(row.amount)}</td><td>${row.account || "-"}</td><td>${row.method || "-"}</td><td>${row.merchant || "-"}</td></tr>`).join("")}</tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>帳戶</th><th>商家 / 對象</th></tr></thead>
+          <tbody>${recent.map(row => `<tr><td>${row.date || ""}</td><td>${row.type === "income" ? "收入" : "支出"}</td><td>${row.category || "-"}</td><td>${row.item || "-"}</td><td class="accounting-amount ${row.type === "income" ? "ok" : "gain"}">${row.type === "income" ? "+" : "-"}${money(row.amount)}</td><td>${row.account || "-"}</td><td>${row.merchant || "-"}</td></tr>`).join("")}</tbody></table></div>
         </article>`;
     }
     function renderGeneric(key, title) {

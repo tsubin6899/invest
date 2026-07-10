@@ -162,6 +162,22 @@
       padding: 0 10px;
       font-size: 13px;
     }
+    .cloud-email {
+      width: 180px;
+      min-height: 36px;
+      border-color: rgba(255,255,255,.2);
+      color: #fffdf8;
+      background: rgba(255,255,255,.08);
+    }
+    .cloud-email::placeholder { color: rgba(255,253,248,.62); }
+    .cloud-status {
+      display: inline-grid;
+      place-items: center;
+      min-height: 36px;
+      color: rgba(255,253,248,.72);
+      font-size: 12px;
+      white-space: nowrap;
+    }
     .layout {
       display: grid;
       grid-template-columns: minmax(300px, 380px) 1fr;
@@ -645,6 +661,7 @@
         font-size: 13px;
         white-space: nowrap;
       }
+      .cloud-email { width: 170px; min-width: 170px; }
       .tabs {
         gap: 8px;
         padding: 8px 14px 10px;
@@ -717,6 +734,12 @@
         </div>
         <div class="top-actions">
           <a class="btn light" href="personal-assets-dashboard.html">資產儀表板</a>
+          <input class="cloud-email" id="cloudEmail" type="email" placeholder="Email 登入同步" autocomplete="email">
+          <button class="btn blue" id="cloudLogin" type="button">登入同步</button>
+          <button class="btn green" id="cloudSave" type="button">儲存雲端</button>
+          <button class="btn purple" id="cloudLoad" type="button">載入雲端</button>
+          <button class="btn dark" id="cloudLogout" type="button">登出</button>
+          <span class="cloud-status" id="cloudStatus">雲端未設定</span>
           <button class="btn purple" id="exportJson" type="button">匯出 JSON</button>
           <button class="btn blue" id="exportCsv" type="button">匯出 CSV</button>
           <button class="btn green" id="importButton" type="button">匯入資料</button>
@@ -742,8 +765,7 @@
               <label>金額<input id="amount" type="number" min="0" step="1" inputmode="decimal" required></label>
               <label>分類<select id="category" required></select></label>
               <label>項目<select id="item"></select></label>
-              <label>付款帳戶<select id="account" required></select></label>
-              <label>付款方式<select id="method"></select></label>
+              <label>帳戶<select id="account" required></select></label>
               <label>商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
               <label class="full">備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
               <button class="btn green full" type="submit">新增記帳</button>
@@ -888,17 +910,6 @@
             </div>
           </div>
         </article>
-        <article class="panel">
-          <div class="panel-pad">
-            <h2>付款方式</h2>
-            <p class="hint">可新增 Apple Pay、悠遊付、街口、轉帳等常用方式。</p>
-            <form id="methodForm" class="manager-form">
-              <input id="newMethod" placeholder="新增方式，例如：悠遊付、街口、Apple Pay">
-              <button class="btn small purple" type="submit">新增</button>
-            </form>
-            <div id="methodPills" class="pill-list"></div>
-          </div>
-        </article>
       </div>
     </section>
 
@@ -925,10 +936,6 @@
           <div id="categoryBars" class="bar-list"></div>
         </article>
         <article class="chart-card">
-          <h3>付款方式占比</h3>
-          <div id="methodBars" class="bar-list"></div>
-        </article>
-        <article class="chart-card">
           <h3>支出項目排行</h3>
           <div id="itemBars" class="bar-list"></div>
         </article>
@@ -951,8 +958,10 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
+    const cloudTable = "asset_dashboard_profiles";
     const accountingTabs = [
       ["entryView", "收入支出"],
       ["accountView", "帳戶設定"],
@@ -983,7 +992,6 @@
     const itemSelect = document.getElementById("item");
     const itemCategorySelect = document.getElementById("itemCategory");
     const accountSelect = document.getElementById("account");
-    const methodSelect = document.getElementById("method");
     const transferForm = document.getElementById("transferForm");
     const transferFromSelect = document.getElementById("transferFrom");
     const transferToSelect = document.getElementById("transferTo");
@@ -998,6 +1006,9 @@
     const invoicePhoto = document.getElementById("invoicePhoto");
     const invoicePreview = document.getElementById("invoicePreview");
     const invoiceStatus = document.getElementById("invoiceStatus");
+    let supabaseClient = null;
+    let cloudUser = null;
+    let cloudReady = false;
     const defaultCategories = {
       income: ["薪資", "股息", "利息", "獎金", "退款", "現金盤點調整", "其他收入"],
       expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "現金盤點調整", "其他支出"]
@@ -1018,7 +1029,6 @@
         現金盤點調整: ["現金短少", "補記漏掉支出"]
       }
     };
-    const defaultMethods = ["現金", "信用卡", "轉帳", "行動支付", "其他"];
     const defaultAccounts = [
       { id: "cash-twd", name: "現金", type: "現金", currency: "TWD", openingBalance: 0 },
       { id: "bank-main", name: "銀行帳戶", type: "銀行帳戶", currency: "TWD", openingBalance: 0 },
@@ -1064,7 +1074,7 @@
           },
           items: normalizeItems(saved.items, entries),
           accounts: normalizeAccounts(saved.accounts, entries),
-          methods: normalizeList(saved.methods, [...defaultMethods, ...entries.map(row => row.method)])
+          methods: normalizeList(saved.methods, [])
         };
       } catch {
         return {
@@ -1074,7 +1084,7 @@
           categories: structuredClone(defaultCategories),
           items: structuredClone(defaultItems),
           accounts: structuredClone(defaultAccounts),
-          methods: [...defaultMethods]
+          methods: []
         };
       }
     }
@@ -1142,6 +1152,147 @@
     function saveLedger() {
       localStorage.setItem(accountingKey, JSON.stringify(ledger));
     }
+    function setCloudStatus(text) {
+      const el = document.getElementById("cloudStatus");
+      if (el) el.textContent = text;
+    }
+    function updateCloudControls() {
+      const loggedIn = Boolean(cloudUser);
+      document.getElementById("cloudSave").disabled = !loggedIn;
+      document.getElementById("cloudLoad").disabled = !loggedIn;
+      document.getElementById("cloudLogout").disabled = !loggedIn;
+      document.getElementById("cloudLogin").disabled = !cloudReady;
+      if (!cloudReady) setCloudStatus("雲端未設定");
+      else if (loggedIn) setCloudStatus("已登入雲端");
+      else setCloudStatus("未登入");
+    }
+    async function loadPublicConfig() {
+      const fallback = {
+        supabaseUrl: window.SUPABASE_URL || "",
+        supabaseAnonKey: window.SUPABASE_ANON_KEY || ""
+      };
+      if (!location.protocol.startsWith("http")) return fallback;
+      try {
+        const response = await fetch(`/api/public-config?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return fallback;
+        const config = await response.json();
+        return {
+          supabaseUrl: config.supabaseUrl || fallback.supabaseUrl,
+          supabaseAnonKey: config.supabaseAnonKey || fallback.supabaseAnonKey
+        };
+      } catch {
+        return fallback;
+      }
+    }
+    async function initCloudSync() {
+      if (!window.supabase?.createClient) {
+        setCloudStatus("SDK 未載入");
+        updateCloudControls();
+        return;
+      }
+      const config = await loadPublicConfig();
+      if (!config.supabaseUrl || !config.supabaseAnonKey) {
+        cloudReady = false;
+        updateCloudControls();
+        return;
+      }
+      supabaseClient = window.supabase.createClient(config.supabaseUrl, config.supabaseAnonKey);
+      cloudReady = true;
+      const { data: sessionData } = await supabaseClient.auth.getSession();
+      cloudUser = sessionData.session?.user || null;
+      supabaseClient.auth.onAuthStateChange((_event, session) => {
+        cloudUser = session?.user || null;
+        updateCloudControls();
+      });
+      updateCloudControls();
+    }
+    async function loginCloudSync() {
+      if (!supabaseClient) return;
+      const email = document.getElementById("cloudEmail").value.trim();
+      if (!email) {
+        toast("請先輸入 Email");
+        return;
+      }
+      const { error } = await supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: location.href.split("#")[0] }
+      });
+      if (error) {
+        toast(`登入信寄送失敗：${error.message}`);
+        return;
+      }
+      toast("登入連結已寄出，請到信箱確認");
+    }
+    async function logoutCloudSync() {
+      if (!supabaseClient) return;
+      await supabaseClient.auth.signOut();
+      cloudUser = null;
+      updateCloudControls();
+      toast("已登出雲端同步");
+    }
+    async function readCloudProfile() {
+      const { data: row, error } = await supabaseClient
+        .from(cloudTable)
+        .select("data, updated_at")
+        .eq("user_id", cloudUser.id)
+        .maybeSingle();
+      if (error) throw error;
+      return row?.data || {};
+    }
+    async function saveCloudData() {
+      if (!supabaseClient || !cloudUser) {
+        toast("請先登入雲端同步");
+        return;
+      }
+      try {
+        const existing = await readCloudProfile();
+        const payload = {
+          ...existing,
+          accountingLedger: ledger
+        };
+        const { error } = await supabaseClient
+          .from(cloudTable)
+          .upsert({ user_id: cloudUser.id, data: payload }, { onConflict: "user_id" });
+        if (error) throw error;
+        toast("記帳資料已儲存到雲端");
+      } catch (error) {
+        toast(`雲端儲存失敗：${error.message}`);
+      }
+    }
+    async function loadCloudData() {
+      if (!supabaseClient || !cloudUser) {
+        toast("請先登入雲端同步");
+        return;
+      }
+      try {
+        const payload = await readCloudProfile();
+        if (!payload.accountingLedger) {
+          toast("雲端尚無記帳資料，已保留本機資料");
+          return;
+        }
+        ledger = hydrateLedger(payload.accountingLedger);
+        saveLedger();
+        render();
+        toast("已載入雲端記帳資料");
+      } catch (error) {
+        toast(`雲端載入失敗：${error.message}`);
+      }
+    }
+    function hydrateLedger(payload = {}) {
+      const entries = Array.isArray(payload.entries) ? payload.entries : [];
+      return {
+        entries,
+        transfers: normalizeTransfers(payload.transfers),
+        creditBills: normalizeCreditBills(payload.creditBills),
+        categories: {
+          income: normalizeList(payload.categories?.income, [...defaultCategories.income, ...entries.filter(row => row.type === "income").map(row => row.category)]),
+          expense: normalizeList(payload.categories?.expense, [...defaultCategories.expense, ...entries.filter(row => row.type !== "income").map(row => row.category)])
+        },
+        items: normalizeItems(payload.items, entries),
+        accounts: normalizeAccounts(payload.accounts, entries),
+        methods: normalizeList(payload.methods, [])
+      };
+    }
     function toast(message) {
       toastEl.textContent = message;
       toastEl.classList.add("show");
@@ -1185,16 +1336,12 @@
       renderAccountOptions(transferToSelect, transferToSelect.value);
       renderAccountOptions(transferFeeAccountSelect, transferFeeAccountSelect.value, true);
       renderCreditBillOptions();
-      const selectedMethod = methodSelect.value;
-      methodSelect.innerHTML = ledger.methods.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
-      if (selectedMethod && ledger.methods.includes(selectedMethod)) methodSelect.value = selectedMethod;
       document.getElementById("categoryPills").innerHTML = (ledger.categories[currentType] || []).map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-category="${escapeHtml(item)}">×</button></span>`).join("");
       const currentCategory = itemCategorySelect.value || categories[0] || "";
       const items = currentCategory ? (ledger.items?.[currentType]?.[currentCategory] || []) : [];
       document.getElementById("itemPills").innerHTML = currentCategory
         ? `<span class="pill">${escapeHtml(currentCategory)}</span>` + (items.map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-item="${escapeHtml(item)}">×</button></span>`).join("") || `<span class="pill">尚未建立項目</span>`)
         : `<span class="pill">請先建立分類</span>`;
-      document.getElementById("methodPills").innerHTML = ledger.methods.map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-method="${escapeHtml(item)}">×</button></span>`).join("");
       renderAccounts();
     }
     function renderAccountOptions(select, selectedValue, allowEmpty = false) {
@@ -1228,7 +1375,7 @@
         .filter(row => type === "all" || row.type === type)
         .filter(row => {
           if (!keyword) return true;
-          return [row.category, row.item, row.account, row.method, row.merchant, row.note].some(value => String(value || "").toLowerCase().includes(keyword));
+          return [row.category, row.item, row.account, row.merchant, row.note].some(value => String(value || "").toLowerCase().includes(keyword));
         })
         .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
     }
@@ -1315,7 +1462,7 @@
         card("本月收入", money(income), "TWD", "dark"),
         card("本月支出", money(expense), "TWD"),
         card("本月結餘", `${balance >= 0 ? "+" : ""}${money(balance)}`, "TWD", "accent"),
-        card("付款帳戶", money(ledger.accounts.length, ""), "含現金 / 銀行 / 信用卡 / 行動支付")
+        card("帳戶", money(ledger.accounts.length, ""), "含現金 / 銀行 / 信用卡 / 行動支付")
       ].join("");
     }
     function card(label, value, unit, cls = "") {
@@ -1333,7 +1480,7 @@
         return;
       }
       document.getElementById(target).innerHTML = `${prefix}<div class="table-wrap"><table>
-        <thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>付款帳戶</th><th>方式</th><th>商家 / 對象</th><th>備註</th><th>操作</th></tr></thead>
+        <thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>帳戶</th><th>商家 / 對象</th><th>備註</th><th>操作</th></tr></thead>
         <tbody>${rows.map(row => {
           const account = ledger.accounts.find(item => item.name === row.account);
           return `<tr>
@@ -1343,7 +1490,6 @@
           <td>${escapeHtml(row.item || "-")}</td>
           <td class="${row.type === "income" ? "amount-income" : "amount-expense"}">${row.type === "income" ? "+" : "-"}${money(row.amount)}</td>
           <td>${escapeHtml(row.account)}${account ? `<br><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}</small>` : ""}</td>
-          <td>${escapeHtml(row.method)}</td>
           <td>${escapeHtml(row.merchant)}</td>
           <td>${escapeHtml(row.note)}</td>
           <td><button class="btn small dark" type="button" data-delete="${row.id}">刪除</button></td>
@@ -1357,12 +1503,11 @@
         .filter(row => String(row.date || "").startsWith(month))
         .forEach(row => {
           const date = row.date;
-          const item = grouped.get(date) || { income: 0, expense: 0, count: 0, labels: [] };
+          const item = grouped.get(date) || { income: 0, expense: 0, count: 0 };
           const amount = Number(row.amount) || 0;
           if (row.type === "income") item.income += amount;
           else item.expense += amount;
           item.count += 1;
-          if (row.category) item.labels.push(row.item ? `${row.category}/${row.item}` : row.category);
           grouped.set(date, item);
         });
       return grouped;
@@ -1386,13 +1531,12 @@
           continue;
         }
         const balance = row.income - row.expense;
-        const labels = [...new Set(row.labels)].slice(0, 2).join("、");
         cells.push(`<button type="button" class="ledger-day${selectedClass}" data-ledger-date="${date}">
           <strong>${day}</strong>
           <div class="day-stat income"><span>收</span><span>${money(row.income)}</span></div>
           <div class="day-stat expense"><span>支</span><span>${money(row.expense)}</span></div>
           <div class="day-stat balance"><span>餘</span><span>${balance >= 0 ? "+" : ""}${money(balance)}</span></div>
-          <div class="day-note">${row.count} 筆${labels ? `｜${escapeHtml(labels)}` : ""}</div>
+          <div class="day-note">${row.count} 筆</div>
         </button>`);
       }
       document.getElementById("ledgerCalendar").innerHTML = `
@@ -1475,7 +1619,6 @@
       renderCards(rows);
       renderBars("categoryBars", groupRows(rows.filter(row => row.type === "expense"), "category"), "var(--blue)");
       renderBars("itemBars", groupRows(rows.filter(row => row.type === "expense"), "item"), "var(--amber)");
-      renderBars("methodBars", groupRows(rows, "method"), "var(--green)");
       renderSelectedDayDetails();
       renderTable("analysisTable", rows);
       renderLedgerCalendar();
@@ -1550,7 +1693,6 @@
         category: categorySelect.value || (currentType === "income" ? "其他收入" : "其他支出"),
         item: itemSelect.value,
         account: accountSelect.value,
-        method: document.getElementById("method").value,
         merchant: document.getElementById("merchant").value.trim(),
         note: document.getElementById("note").value.trim(),
         createdAt: new Date().toISOString()
@@ -1645,14 +1787,6 @@
         render();
         toast("已刪除項目");
       }
-      const removeMethod = event.target.closest("[data-remove-method]");
-      if (removeMethod) {
-        const value = removeMethod.dataset.removeMethod;
-        ledger.methods = ledger.methods.filter(item => item !== value);
-        saveLedger();
-        render();
-        toast("已刪除付款方式");
-      }
       const removeAccount = event.target.closest("[data-remove-account]");
       if (removeAccount) {
         const value = removeAccount.dataset.removeAccount;
@@ -1714,7 +1848,7 @@
       saveLedger();
       render();
       accountSelect.value = name;
-      toast("已新增付款帳戶");
+      toast("已新增帳戶");
     });
     document.getElementById("creditForm").addEventListener("submit", event => {
       event.preventDefault();
@@ -1835,18 +1969,6 @@
       render();
       toast("已新增轉帳");
     });
-    document.getElementById("methodForm").addEventListener("submit", event => {
-      event.preventDefault();
-      const input = document.getElementById("newMethod");
-      const value = input.value.trim();
-      if (!value) return;
-      ledger.methods = normalizeList([...ledger.methods, value], []);
-      input.value = "";
-      saveLedger();
-      render();
-      methodSelect.value = value;
-      toast("已新增付款方式");
-    });
     invoicePhoto.addEventListener("change", () => {
       const file = invoicePhoto.files?.[0];
       if (!file) {
@@ -1864,11 +1986,15 @@
     [monthFilter, typeFilter, searchInput].forEach(el => el.addEventListener("input", render));
     document.getElementById("exportJson").addEventListener("click", () => download("tsubin-accounting-data.json", JSON.stringify(ledger, null, 2), "application/json"));
     document.getElementById("exportCsv").addEventListener("click", () => {
-      const header = ["日期", "類型", "分類", "項目", "金額", "帳戶", "方式", "商家/對象", "備註"];
-      const lines = [header.map(csvEscape).join(","), ...filteredEntries().map(row => [row.date, row.type === "income" ? "收入" : "支出", row.category, row.item || "", row.amount, row.account, row.method, row.merchant, row.note].map(csvEscape).join(","))];
+      const header = ["日期", "類型", "分類", "項目", "金額", "帳戶", "商家/對象", "備註"];
+      const lines = [header.map(csvEscape).join(","), ...filteredEntries().map(row => [row.date, row.type === "income" ? "收入" : "支出", row.category, row.item || "", row.amount, row.account, row.merchant, row.note].map(csvEscape).join(","))];
       download("tsubin-accounting-data.csv", "\ufeff" + lines.join("\n"), "text/csv;charset=utf-8");
     });
     document.getElementById("importButton").addEventListener("click", () => document.getElementById("importFile").click());
+    document.getElementById("cloudLogin").addEventListener("click", loginCloudSync);
+    document.getElementById("cloudSave").addEventListener("click", saveCloudData);
+    document.getElementById("cloudLoad").addEventListener("click", loadCloudData);
+    document.getElementById("cloudLogout").addEventListener("click", logoutCloudSync);
     document.getElementById("importFile").addEventListener("change", async event => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -1887,7 +2013,7 @@
         },
         items: normalizeItems(payload.items, payload.entries),
         accounts: normalizeAccounts(payload.accounts, payload.entries),
-        methods: normalizeList(payload.methods, [...defaultMethods, ...payload.entries.map(row => row.method)])
+        methods: normalizeList(payload.methods, [])
       };
       saveLedger();
       render();
@@ -1903,7 +2029,7 @@
         categories: structuredClone(defaultCategories),
         items: structuredClone(defaultItems),
         accounts: structuredClone(defaultAccounts),
-        methods: [...defaultMethods]
+        methods: []
       };
       saveLedger();
       render();
@@ -1915,6 +2041,7 @@
     monthFilter.value = monthOf();
     setType("expense");
     render();
+    initCloudSync();
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
       window.addEventListener("load", () => {
         navigator.serviceWorker.register("service-worker.js").catch(() => {});
