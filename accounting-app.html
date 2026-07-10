@@ -848,13 +848,13 @@
       .calendar-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
       .calendar-actions .btn { width: 100%; min-height: 34px; padding: 0 6px; }
       .calendar-scroll {
-        overflow-x: auto;
-        margin: 0 -4px;
-        padding: 0 4px 6px;
-        -webkit-overflow-scrolling: touch;
-        scrollbar-width: thin;
+        overflow: visible;
+        margin: 0;
+        padding: 0;
       }
-      .ledger-calendar { grid-template-columns: repeat(7, minmax(94px, 1fr)); min-width: 700px; gap: 7px; }
+      .ledger-calendar { grid-template-columns: repeat(3, minmax(0, 1fr)); min-width: 0; gap: 8px; }
+      .ledger-calendar .weekday,
+      .ledger-calendar .ledger-day.empty { display: none; }
       .ledger-day, .ledger-day.empty {
         min-height: 104px;
         padding: 9px;
