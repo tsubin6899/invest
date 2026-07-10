@@ -1211,6 +1211,7 @@
       { id: "bank-main", name: "銀行帳戶", type: "銀行帳戶", currency: "TWD", openingBalance: 0 },
       { id: "credit-card", name: "信用卡", type: "信用卡", currency: "TWD", openingBalance: 0 }
     ];
+    const accountTypes = ["現金", "銀行帳戶", "外幣銀行帳戶", "外幣現金", "信用卡", "行動支付", "其他"];
     let currentType = "expense";
     let currentView = "entryView";
     let ledgerCalendarMonth = monthOf();
@@ -1627,6 +1628,7 @@
       const selectedAccount = accountSelect.value;
       accountSelect.innerHTML = ledger.accounts.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.type)}｜${escapeHtml(account.currency)}</option>`).join("");
       if (selectedAccount && ledger.accounts.some(account => account.name === selectedAccount)) accountSelect.value = selectedAccount;
+      renderEntryAccountOptions(selectedAccount);
       renderAccountOptions(transferFromSelect, transferFromSelect.value);
       renderAccountOptions(transferToSelect, transferToSelect.value);
       renderAccountOptions(transferFeeAccountSelect, transferFeeAccountSelect.value, true);
