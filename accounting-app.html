@@ -901,7 +901,7 @@
       font-size: 16px;
       font-weight: 650;
     }
-    .account-actions button[data-remove-account] {
+    .account-actions button[data-remove-account], .account-actions button[data-remove-recurring] {
       display: inline-grid;
       place-items: center;
       width: 32px;
@@ -2453,7 +2453,7 @@
     function renderRecurringRules() {
       const target = document.getElementById("recurringList");
       target.innerHTML = (ledger.recurringRules || []).length
-        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${recurringScheduleLabel(row)}｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" data-remove-recurring="${escapeHtml(row.id)}">刪除</button></div></div>`).join("")
+        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${recurringScheduleLabel(row)}｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" title="刪除固定收支" aria-label="刪除固定收支" data-remove-recurring="${escapeHtml(row.id)}">刪</button></div></div>`).join("")
         : `<div class="empty">尚未建立固定收支</div>`;
     }
     function recurringScheduleLabel(rule) {
