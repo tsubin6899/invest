@@ -28,6 +28,10 @@
       --shadow: 0 18px 48px rgba(31,38,51,.14);
     }
     * { box-sizing: border-box; }
+    html, body {
+      max-width: 100%;
+      overflow-x: clip;
+    }
     body {
       margin: 0;
       color: var(--ink);
@@ -203,6 +207,7 @@
       gap: 16px;
       align-items: start;
     }
+    .view-grid > *, .form-grid > *, .tool-grid > *, .account-form > * { min-width: 0; }
     .panel, .card, .chart-card {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -296,6 +301,23 @@
       display: grid;
       gap: 8px;
       margin-top: 10px;
+    }
+    #accountList {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    #accountList .account-tile {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-content: space-between;
+      min-height: 112px;
+    }
+    #accountList .account-meta { grid-column: 1 / -1; }
+    #accountList .account-balance {
+      align-self: end;
+      text-align: left;
+    }
+    #accountList .account-actions {
+      align-self: end;
+      justify-content: flex-end;
     }
     .account-tile {
       display: grid;
@@ -746,9 +768,16 @@
       }
       .view { width: calc(100% - 20px); margin-top: 14px; }
       .layout, .view-grid { grid-template-columns: 1fr; }
+      .panel { min-width: 0; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
+      #accountList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #accountList .account-tile { min-height: 126px; gap: 7px; padding: 9px; }
+      #accountList .account-meta strong { overflow-wrap: anywhere; }
+      #accountList .account-meta small { font-size: 11px; line-height: 1.35; }
+      #accountList .account-balance { font-size: 13px; }
+      #accountList .account-actions { width: auto; }
       .transfer-summary { grid-template-columns: 1fr; }
       .account-tile {
         grid-template-columns: minmax(0, 1fr);
@@ -1035,27 +1064,11 @@
       </div>
     </section>
 
-    <section class="view" id="analyticsView">
-      <div class="toolbar">
-        <div>
-          <h2>統計分析</h2>
-          <p class="hint">預設顯示本月，可依月份、類型或關鍵字篩選。</p>
-        </div>
-        <div class="filters">
-          <input id="monthFilter" type="month">
-          <select id="typeFilter">
-            <option value="all">全部</option>
-            <option value="expense">支出</option>
-            <option value="income">收入</option>
-          </select>
-          <input id="searchInput" type="search" placeholder="搜尋分類、商家、備註">
-        </div>
-      </div>
-      <div class="cards" id="summaryCards"></div>
+    <section class="view" id="recurringView">
       <article class="panel">
         <div class="panel-pad">
-          <h3>固定收入 / 固定支出</h3>
-          <p class="hint">例如薪資、房租、保險、訂閱。設定後可一鍵產生本月待記錄項目。</p>
+          <h2>固定收入 / 固定支出</h2>
+          <p class="hint">設定薪資、房租、房貸、保險、訂閱等週期項目；到期日後便不再產生記帳資料。</p>
           <form id="recurringForm" class="tool-grid">
             <select id="recurringType"><option value="expense">支出</option><option value="income">收入</option></select>
             <input id="recurringName" placeholder="名稱，例如：房租">
@@ -1075,6 +1088,25 @@
           <div id="recurringList" class="account-list"></div>
         </div>
       </article>
+    </section>
+
+    <section class="view" id="analyticsView">
+      <div class="toolbar">
+        <div>
+          <h2>統計分析</h2>
+          <p class="hint">預設顯示本月，可依月份、類型或關鍵字篩選。</p>
+        </div>
+        <div class="filters">
+          <input id="monthFilter" type="month">
+          <select id="typeFilter">
+            <option value="all">全部</option>
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+          <input id="searchInput" type="search" placeholder="搜尋分類、商家、備註">
+        </div>
+      </div>
+      <div class="cards" id="summaryCards"></div>
       <article class="panel">
         <div class="panel-pad">
           <h3>分類預算與警示</h3>
@@ -1126,6 +1158,7 @@
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
     const dashboardStorageKey = "personal-assets-dashboard-tsubin-v2";
+    const trustedDeviceKey = "tsubin-accounting-trusted-device-v1";
     let sharedFxRates = { TWD: 1 };
     const cloudTable = "asset_dashboard_profiles";
     const accountingTabs = [
@@ -1133,6 +1166,7 @@
       ["accountView", "帳戶設定"],
       ["creditView", "信用卡設定"],
       ["transferView", "帳戶轉帳"],
+      ["recurringView", "固定收支"],
       ["categoryView", "分類設定"],
       ["analyticsView", "統計分析"]
     ];
@@ -1141,6 +1175,7 @@
       accountView: "wallet-cards",
       creditView: "credit-card",
       transferView: "arrow-left-right",
+      recurringView: "calendar-clock",
       categoryView: "tags",
       analyticsView: "chart-no-axes-combined"
     };
@@ -1149,6 +1184,7 @@
       accountView: "戶",
       creditView: "卡",
       transferView: "轉",
+      recurringView: "固",
       categoryView: "類",
       analyticsView: "圖"
     };
@@ -1524,10 +1560,20 @@
       document.getElementById("cloudSave").disabled = !loggedIn;
       document.getElementById("cloudLoad").disabled = !loggedIn;
       document.getElementById("cloudLogout").disabled = !loggedIn;
-      document.getElementById("cloudLogin").disabled = !cloudReady;
+      document.getElementById("cloudLogin").disabled = !cloudReady || loggedIn;
+      document.getElementById("cloudEmail").disabled = loggedIn;
       if (!cloudReady) setCloudStatus("雲端未設定");
-      else if (loggedIn) setCloudStatus("已登入雲端");
+      else if (loggedIn) setCloudStatus("此裝置已登入");
       else setCloudStatus("未登入");
+    }
+    function rememberCloudDevice(user) {
+      if (!user?.id) return;
+      localStorage.setItem(trustedDeviceKey, JSON.stringify({
+        userId: user.id,
+        email: user.email || "",
+        rememberedAt: new Date().toISOString()
+      }));
+      navigator.storage?.persist?.().catch(() => {});
     }
     async function loadPublicConfig() {
       const fallback = {
@@ -1580,9 +1626,15 @@
       cloudReady = true;
       const { data: sessionData } = await supabaseClient.auth.getSession();
       cloudUser = sessionData.session?.user || null;
+      if (cloudUser) rememberCloudDevice(cloudUser);
       supabaseClient.auth.onAuthStateChange((_event, session) => {
         cloudUser = session?.user || null;
-        if (session?.user) cleanCloudAuthUrl();
+        if (session?.user) {
+          rememberCloudDevice(session.user);
+          cleanCloudAuthUrl();
+        } else if (_event === "SIGNED_OUT") {
+          localStorage.removeItem(trustedDeviceKey);
+        }
         updateCloudControls();
       });
       updateCloudControls();
@@ -1608,6 +1660,7 @@
       if (!supabaseClient) return;
       await supabaseClient.auth.signOut();
       cloudUser = null;
+      localStorage.removeItem(trustedDeviceKey);
       updateCloudControls();
       toast("已登出雲端同步");
     }
