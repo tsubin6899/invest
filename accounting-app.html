@@ -658,7 +658,6 @@
     }
     .day-stat.income span:last-child { color: var(--green); font-weight: 800; }
     .day-stat.expense span:last-child { color: var(--red); font-weight: 800; }
-    .day-stat.balance span:last-child { color: var(--blue); font-weight: 800; }
     .day-note {
       margin-top: 2px;
       color: var(--muted);
@@ -2413,12 +2412,10 @@
           cells.push(`<button type="button" class="ledger-day${selectedClass}" data-ledger-date="${date}"><strong>${day}</strong><div class="day-note">尚無紀錄</div></button>`);
           continue;
         }
-        const balance = row.income - row.expense;
         cells.push(`<button type="button" class="ledger-day${selectedClass}" data-ledger-date="${date}">
           <strong>${day}</strong>
           <div class="day-stat income"><span>收</span><span>${money(row.income)}</span></div>
           <div class="day-stat expense"><span>支</span><span>${money(row.expense)}</span></div>
-          <div class="day-stat balance"><span>餘</span><span>${balance >= 0 ? "+" : ""}${money(balance)}</span></div>
           <div class="day-note">${row.count} 筆</div>
         </button>`);
       }
