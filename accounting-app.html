@@ -152,6 +152,7 @@
     .btn.green { background: var(--green); }
     .btn.purple { background: var(--purple); }
     .btn.dark { background: #2f3745; }
+    .btn.danger { background: #c24f35; }
     .btn.light {
       color: var(--ink);
       background: #fffdf8;
@@ -522,7 +523,7 @@
           <button class="btn purple" id="exportJson" type="button">匯出 JSON</button>
           <button class="btn blue" id="exportCsv" type="button">匯出 CSV</button>
           <button class="btn green" id="importButton" type="button">匯入資料</button>
-          <button class="btn dark" id="clearData" type="button">清空</button>
+          <button class="btn danger" id="clearData" type="button">清空資料</button>
           <input id="importFile" type="file" accept="application/json" hidden>
         </div>
       </div>
@@ -1111,7 +1112,7 @@
       const removeItem = event.target.closest("[data-remove-item]");
       if (removeItem) {
         const value = removeItem.dataset.removeItem;
-        const category = categorySelect.value;
+        const category = itemCategorySelect.value;
         ledger.items[currentType][category] = (ledger.items[currentType][category] || []).filter(item => item !== value);
         saveLedger();
         render();
@@ -1154,7 +1155,7 @@
       event.preventDefault();
       const input = document.getElementById("newItem");
       const value = input.value.trim();
-      const category = categorySelect.value;
+      const category = itemCategorySelect.value;
       if (!value || !category) return;
       if (!ledger.items[currentType]) ledger.items[currentType] = {};
       ledger.items[currentType][category] = normalizeList([...(ledger.items[currentType][category] || []), value], []);
