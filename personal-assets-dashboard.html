@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -1783,7 +1783,7 @@
     function allTotals() {
       const tw = stockValue(data.tw);
       const us = stockValue(data.us, data.rates.usd);
-      const cash = sum(data.cash, twdCash) + (Number(data.rates.reserve) || 0);
+      const cash = sum(cashRows(), twdCash) + (Number(data.rates.reserve) || 0);
       const cards = sum(data.cards, r => r.amount);
       const gold = goldGram() * data.rates.goldGram;
       const silver = silverOz() * data.rates.silverOz;
@@ -1807,6 +1807,7 @@
         const saved = JSON.parse(localStorage.getItem(accountingStorageKey) || "{}");
         return {
           ...saved,
+          accounts: Array.isArray(saved.accounts) ? saved.accounts : [],
           entries: Array.isArray(saved.entries) ? saved.entries : [],
           transfers: Array.isArray(saved.transfers) ? saved.transfers : [],
           creditBills: Array.isArray(saved.creditBills) ? saved.creditBills : [],
@@ -1817,8 +1818,67 @@
           reconciliations: Array.isArray(saved.reconciliations) ? saved.reconciliations : []
         };
       } catch {
-        return { entries: [], transfers: [], creditBills: [], creditInstallments: [], templates: [], recurringRules: [], budgets: [], reconciliations: [] };
+        return { accounts: [], entries: [], transfers: [], creditBills: [], creditInstallments: [], templates: [], recurringRules: [], budgets: [], reconciliations: [] };
       }
+    }
+    function accountingInstallmentAmount(row, index) {
+      const total = Math.round(Number(row.totalAmount) || 0);
+      const months = Math.max(1, Number(row.months) || 1);
+      const base = Math.floor(total / months);
+      const remainder = total - base * months;
+      return base + (index < remainder ? 1 : 0);
+    }
+    function accountingFirstDayOfMonth(month) {
+      return `${month || localMonthString()}-01`;
+    }
+    function accountingInstallmentEntries(ledger) {
+      return (ledger.creditInstallments || []).flatMap(row =>
+        Array.from({ length: Math.max(1, Number(row.months) || 1) }, (_, index) => ({
+          type: "expense",
+          date: accountingFirstDayOfMonth(shiftMonth(row.startMonth || localMonthString(), index)),
+          amount: accountingInstallmentAmount(row, index),
+          category: row.category,
+          item: row.item,
+          account: row.card,
+          merchant: row.merchant,
+          createdAt: row.createdAt,
+          virtualInstallment: true
+        }))
+      );
+    }
+    function accountingAllEntryRows(ledger) {
+      return [...(ledger.entries || []), ...accountingInstallmentEntries(ledger)];
+    }
+    function accountingAccountBalance(account, ledger) {
+      const entryTotal = accountingAllEntryRows(ledger).reduce((total, row) => {
+        if (row.account !== account.name) return total;
+        const amount = Number(row.amount) || 0;
+        return total + (row.type === "income" ? amount : -amount);
+      }, Number(account.openingBalance) || 0);
+      return (ledger.transfers || []).reduce((total, row) => {
+        const fromAmount = Number(row.fromAmount) || 0;
+        const toAmount = Number(row.toAmount) || 0;
+        const feeAmount = Number(row.feeAmount) || 0;
+        const feeAccount = row.feeAccount || row.fromAccount;
+        let next = total;
+        if (row.fromAccount === account.name) next -= fromAmount;
+        if (row.toAccount === account.name) next += toAmount;
+        if (feeAmount && feeAccount === account.name) next -= feeAmount;
+        return next;
+      }, entryTotal);
+    }
+    function cashRows() {
+      const ledger = loadAccountingLedger();
+      const rows = (ledger.accounts || [])
+        .filter(account => account.type !== "信用卡")
+        .map(account => ({
+          bank: account.name,
+          currency: normalizeCurrency(account.currency),
+          amount: accountingAccountBalance(account, ledger),
+          type: account.type,
+          source: "accounting"
+        }));
+      return rows.length ? rows : data.cash;
     }
     function accountingRows(month = localMonthString()) {
       return loadAccountingLedger().entries
@@ -1992,7 +2052,7 @@
     }
     function cashBankShareItems() {
       const grouped = new Map();
-      data.cash
+      cashRows()
         .filter(row => normalizeCurrency(row.currency) === "TWD")
         .forEach(row => {
           const label = String(row.bank || "未命名銀行").trim() || "未命名銀行";
@@ -2002,7 +2062,7 @@
     }
     function cashCurrencyShareItems() {
       const grouped = new Map();
-      data.cash.forEach(row => {
+      cashRows().forEach(row => {
         const currency = normalizeCurrency(row.currency);
         grouped.set(currency, (grouped.get(currency) || 0) + twdCash(row));
       });
@@ -2017,7 +2077,7 @@
       </div>`;
     }
     function cashPressureRows() {
-      const bank = sum(data.cash, twdCash);
+      const bank = sum(cashRows(), twdCash);
       const reserve = Number(data.rates.reserve) || 0;
       const cards = sum(data.cards, row => Number(row.amount) || 0);
       const available = Math.max(0, bank + reserve - cards);
@@ -2033,7 +2093,7 @@
     }
     function cashFxImpactRows() {
       const grouped = new Map();
-      data.cash.forEach(row => {
+      cashRows().forEach(row => {
         const currency = normalizeCurrency(row.currency);
         if (currency === "TWD") return;
         grouped.set(currency, (grouped.get(currency) || 0) + twdCash(row));
@@ -2147,7 +2207,7 @@
     }
     function usdExposure() {
       const usStocksUsd = sum(data.us, row => (Number(row.shares) || 0) * (Number(row.price) || 0));
-      const usdCash = sum(data.cash.filter(row => normalizeCurrency(row.currency) === "USD"), row => Number(row.amount) || 0);
+      const usdCash = sum(cashRows().filter(row => normalizeCurrency(row.currency) === "USD"), row => Number(row.amount) || 0);
       return usStocksUsd + usdCash;
     }
     function dividendTwd(row) {
@@ -2378,7 +2438,7 @@
       });
       checkStock(data.tw, "台股");
       checkStock(data.us, "美股");
-      data.cash.forEach(row => {
+      cashRows().forEach(row => {
         const currency = normalizeCurrency(row.currency);
         if (!fxRate(currency)) issues.push(`${currency} 匯率未設定`);
       });
@@ -2598,12 +2658,13 @@
       `;
     }
     function renderCash() {
-      const bank = sum(data.cash, twdCash);
+      const bank = sum(cashRows(), twdCash);
       const reserved = sum(data.cards, r => r.amount);
       const reserve = Number(data.rates.reserve) || 0;
-      const currencies = [...new Set(["TWD", ...data.cash.map(row => normalizeCurrency(row.currency)).filter(Boolean)])];
+      const cashAccounts = cashRows();
+      const currencies = [...new Set(["TWD", ...cashAccounts.map(row => normalizeCurrency(row.currency)).filter(Boolean)])];
       return `
-        ${section("cash", "現金帳戶", "", `<button class="btn blue small" data-add="cash">+ 新增銀行帳戶</button>`)}
+        ${section("cash", "現金帳戶", "現金、銀行、外幣現金、外幣銀行帳戶與行動支付餘額會直接讀取記帳 App。", `<a class="btn green small" href="accounting-app.html">開啟記帳 App</a>`)}
         <div class="cards">
           ${card("銀行現金總計", money(bank), "TWD，只計銀行帳戶")}
           ${card("現金類合計", money(bank + reserve), "銀行現金 + 預備金", "dark")}
@@ -2626,7 +2687,7 @@
         </div></article>
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr><th>銀行名稱</th><th>幣別</th><th>匯率</th><th>現金餘額</th><th>折台幣</th><th>操作</th></tr></thead>
-          <tbody>${data.cash.map((r, i) => `<tr><td>${textInput(r.bank, `cash.${i}.bank`)}</td><td>${textInput(normalizeCurrency(r.currency), `cash.${i}.currency`)}</td><td>${rateText(fxRate(r.currency))}</td><td>${textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td><button class="icon-btn" data-del="cash.${i}">刪</button></td></tr>`).join("")}</tbody>
+          <tbody>${cashAccounts.map((r, i) => `<tr><td>${r.source === "accounting" ? escapeHtml(r.bank || "") : textInput(r.bank, `cash.${i}.bank`)}</td><td>${r.source === "accounting" ? escapeHtml(normalizeCurrency(r.currency)) : textInput(normalizeCurrency(r.currency), `cash.${i}.currency`)}</td><td>${rateText(fxRate(r.currency))}</td><td>${r.source === "accounting" ? money(r.amount, normalizeCurrency(r.currency)) : textInput(r.amount, `cash.${i}.amount`, "number")}</td><td>${money(twdCash(r))}</td><td>${r.source === "accounting" ? "記帳 App" : `<button class="icon-btn" data-del="cash.${i}">刪</button>`}</td></tr>`).join("")}</tbody>
         </table></div></article>
         <article class="panel"><div class="panel-pad">${section("cards", "信用卡款項紀錄", "只記錄信用卡本期待繳總額，提醒用，不併入總資產與銀行現金統計。", `<button class="btn green small" data-add="cards">+ 新增信用卡款項</button>`)}
           <div class="table-wrap"><table><thead><tr><th>信用卡 / 銀行</th><th>本期待繳金額</th><th>繳款期限</th><th>備註</th><th>操作</th></tr></thead><tbody>${data.cards.map((r, i) => `<tr><td>${textInput(r.card, `cards.${i}.card`)}</td><td>${textInput(r.amount, `cards.${i}.amount`, "number")}</td><td>${textInput(r.due, `cards.${i}.due`)}</td><td>${textInput(r.note, `cards.${i}.note`)}</td><td><button class="icon-btn" data-del="cards.${i}">刪</button></td></tr>`).join("")}</tbody></table></div>
@@ -3154,7 +3215,7 @@
       const rows = [["類別", "代號/項目", "名稱", "數量", "成本", "現價/金額", "現值"]];
       data.tw.forEach(r => rows.push(["台股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
       data.us.forEach(r => rows.push(["美股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
-      data.cash.forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
+      cashRows().forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
       data.gold.forEach(r => rows.push(["黃金", "", r.item, r.gram, r.gold + r.labor, data.rates.goldGram, r.gram * data.rates.goldGram]));
       data.silver.forEach(r => rows.push(["白銀", "", r.item, r.qty * r.oz, r.cost, data.rates.silverOz, r.qty * r.oz * data.rates.silverOz]));
       const tradeSummary = buildTradeSummary();
@@ -3387,3 +3448,4 @@
   </script>
 </body>
 </html>
+

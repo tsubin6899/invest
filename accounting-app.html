@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-Hant">
 <head>
   <meta charset="utf-8">
@@ -1119,6 +1119,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
+    const dashboardStorageKey = "personal-assets-dashboard-tsubin-v2";
+    let sharedFxRates = { TWD: 1 };
     const cloudTable = "asset_dashboard_profiles";
     const accountingTabs = [
       ["entryView", "收入支出"],
@@ -1243,6 +1245,39 @@
     }
     function money(value) {
       return Math.round(Number(value) || 0).toLocaleString("zh-TW");
+    }
+    function normalizeCurrency(value) {
+      return String(value || "TWD").trim().toUpperCase();
+    }
+    function loadSharedFxRates() {
+      try {
+        const dashboard = JSON.parse(localStorage.getItem(dashboardStorageKey) || "{}");
+        sharedFxRates = { TWD: 1, ...(dashboard.fxRates || {}) };
+      } catch {
+        sharedFxRates = { TWD: 1 };
+      }
+    }
+    async function refreshSharedFxRates() {
+      loadSharedFxRates();
+      if (!location.protocol.startsWith("http")) return;
+      try {
+        const response = await fetch(`latest-rates.json?ts=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        const rates = payload.rates || {};
+        Object.entries(rates).forEach(([currency, value]) => {
+          const code = normalizeCurrency(currency);
+          const rate = Number(value);
+          if (code && code !== "TWD" && Number.isFinite(rate) && rate > 0) sharedFxRates[code] = rate;
+        });
+        sharedFxRates.TWD = 1;
+      } catch {}
+    }
+    function fxRate(currency) {
+      return Number(sharedFxRates[normalizeCurrency(currency)] ?? 1) || 1;
+    }
+    function twdEquivalent(value, currency) {
+      return (Number(value) || 0) * fxRate(currency);
     }
     function installmentAmount(row, index) {
       const total = Math.round(Number(row.totalAmount) || 0);
@@ -1776,9 +1811,11 @@
       const regularAccounts = ledger.accounts.filter(account => account.type !== "信用卡");
       document.getElementById("accountList").innerHTML = regularAccounts.map(account => {
         const balance = accountBalance(account);
+        const currency = normalizeCurrency(account.currency);
+        const twdText = currency === "TWD" ? "" : `<small>約 ${money(twdEquivalent(balance, currency))} TWD</small>`;
         return `<div class="account-tile">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
-          <span class="account-balance">${money(balance)} ${escapeHtml(account.currency)}</span>
+          <span class="account-balance">${money(balance)} ${escapeHtml(currency)}${twdText}</span>
           <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立一般帳戶</div>`;
@@ -2783,8 +2820,10 @@
     document.getElementById("installmentStartMonth").value = monthOf();
     document.getElementById("billMonth").value = monthOf();
     monthFilter.value = monthOf();
+    loadSharedFxRates();
     setType("expense");
     render();
+    refreshSharedFxRates().then(render);
     initCloudSync();
     if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
       window.addEventListener("load", () => {
@@ -2794,3 +2833,4 @@
   </script>
 </body>
 </html>
+
