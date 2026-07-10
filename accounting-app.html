@@ -512,6 +512,16 @@
       display: grid;
       align-content: start;
       gap: 5px;
+      text-align: left;
+      cursor: pointer;
+    }
+    button.ledger-day {
+      color: inherit;
+      font: inherit;
+    }
+    .ledger-day.selected {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(52,121,150,.14);
     }
     .ledger-day.empty {
       min-height: 106px;
@@ -539,6 +549,40 @@
       font-size: 11px;
       line-height: 1.35;
       overflow-wrap: anywhere;
+    }
+    .selected-day-details {
+      margin-top: 14px;
+    }
+    .selected-day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .bill-grid {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .bill-grid .btn {
+      min-height: 42px;
+    }
+    .bill-status {
+      display: inline-flex;
+      align-items: center;
+      min-height: 26px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 850;
+      background: #f7e5de;
+      color: #9a3e31;
+    }
+    .bill-status.paid {
+      background: #dff1e8;
+      color: #287353;
     }
     .toast {
       position: fixed;
@@ -634,6 +678,8 @@
         min-height: 88px;
         padding: 7px;
       }
+      .selected-day-head { align-items: flex-start; flex-direction: column; }
+      .bill-grid { grid-template-columns: 1fr; }
       .weekday, .day-stat, .day-note { font-size: 10px; }
       .ledger-day strong { font-size: 12px; }
       .filters input, .filters select { width: 100%; min-width: 0; }
@@ -762,6 +808,19 @@
             <button class="btn small green" type="submit">新增信用卡</button>
           </form>
           <div id="creditList" class="account-list"></div>
+          <div class="manager-block">
+            <h3>信用卡帳單繳款</h3>
+            <p class="hint">建立某張信用卡某月份應繳金額，指定從哪個銀行帳戶繳；按「已繳款」後會自動記錄轉帳並扣除銀行餘額。</p>
+            <form id="creditBillForm" class="bill-grid">
+              <label>信用卡<select id="billCard" required></select></label>
+              <label>帳單月份<input id="billMonth" type="month" required></label>
+              <label>應繳金額<input id="billAmount" type="number" min="0" step="1" inputmode="decimal" required></label>
+              <label>繳款帳戶<select id="billPayAccount" required></select></label>
+              <label>繳款截止日<input id="billDueDate" type="date"></label>
+              <button class="btn green" type="submit">新增帳單</button>
+            </form>
+            <div id="creditBillList" class="account-list"></div>
+          </div>
         </div>
       </article>
     </section>
@@ -928,6 +987,9 @@
     const transferFromSelect = document.getElementById("transferFrom");
     const transferToSelect = document.getElementById("transferTo");
     const transferFeeAccountSelect = document.getElementById("transferFeeAccount");
+    const creditBillForm = document.getElementById("creditBillForm");
+    const billCardSelect = document.getElementById("billCard");
+    const billPayAccountSelect = document.getElementById("billPayAccount");
     const monthFilter = document.getElementById("monthFilter");
     const typeFilter = document.getElementById("typeFilter");
     const searchInput = document.getElementById("searchInput");
@@ -989,9 +1051,11 @@
         const saved = JSON.parse(localStorage.getItem(accountingKey) || "{}");
         const entries = Array.isArray(saved.entries) ? saved.entries : [];
         const transfers = normalizeTransfers(saved.transfers);
+        const creditBills = normalizeCreditBills(saved.creditBills);
         return {
           entries,
           transfers,
+          creditBills,
           categories: {
             income: normalizeList(saved.categories?.income, [...defaultCategories.income, ...entries.filter(row => row.type === "income").map(row => row.category)]),
             expense: normalizeList(saved.categories?.expense, [...defaultCategories.expense, ...entries.filter(row => row.type !== "income").map(row => row.category)])
@@ -1004,6 +1068,7 @@
         return {
           entries: [],
           transfers: [],
+          creditBills: [],
           categories: structuredClone(defaultCategories),
           items: structuredClone(defaultItems),
           accounts: structuredClone(defaultAccounts),
@@ -1058,6 +1123,20 @@
         createdAt: row.createdAt || new Date().toISOString()
       })).filter(row => row.fromAccount && row.toAccount && row.fromAmount > 0 && row.toAmount > 0);
     }
+    function normalizeCreditBills(saved) {
+      return (Array.isArray(saved) ? saved : []).map(row => ({
+        id: row.id || uid(),
+        card: String(row.card || "").trim(),
+        billMonth: String(row.billMonth || "").trim(),
+        dueDate: String(row.dueDate || "").trim(),
+        amount: Number(row.amount) || 0,
+        payAccount: String(row.payAccount || "").trim(),
+        paid: Boolean(row.paid),
+        paidAt: row.paidAt || "",
+        transferId: row.transferId || "",
+        createdAt: row.createdAt || new Date().toISOString()
+      })).filter(row => row.card && row.billMonth && row.amount > 0 && row.payAccount);
+    }
     function saveLedger() {
       localStorage.setItem(accountingKey, JSON.stringify(ledger));
     }
@@ -1103,6 +1182,7 @@
       renderAccountOptions(transferFromSelect, transferFromSelect.value);
       renderAccountOptions(transferToSelect, transferToSelect.value);
       renderAccountOptions(transferFeeAccountSelect, transferFeeAccountSelect.value, true);
+      renderCreditBillOptions();
       const selectedMethod = methodSelect.value;
       methodSelect.innerHTML = ledger.methods.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
       if (selectedMethod && ledger.methods.includes(selectedMethod)) methodSelect.value = selectedMethod;
@@ -1123,6 +1203,16 @@
       ];
       select.innerHTML = options.join("");
       if (selectedValue && ledger.accounts.some(account => account.name === selectedValue)) select.value = selectedValue;
+    }
+    function renderCreditBillOptions() {
+      const cards = ledger.accounts.filter(account => account.type === "信用卡");
+      const payAccounts = ledger.accounts.filter(account => account.type !== "信用卡");
+      const selectedCard = billCardSelect.value;
+      const selectedPayAccount = billPayAccountSelect.value;
+      billCardSelect.innerHTML = cards.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.currency)}</option>`).join("");
+      billPayAccountSelect.innerHTML = payAccounts.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.currency)}</option>`).join("");
+      if (selectedCard && cards.some(account => account.name === selectedCard)) billCardSelect.value = selectedCard;
+      if (selectedPayAccount && payAccounts.some(account => account.name === selectedPayAccount)) billPayAccountSelect.value = selectedPayAccount;
     }
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
