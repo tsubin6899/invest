@@ -273,7 +273,7 @@
       display: grid;
       gap: 10px;
     }
-    .invoice-preview {
+    .invoice-preview, .receipt-preview {
       width: 100%;
       max-height: 220px;
       object-fit: contain;
@@ -282,6 +282,25 @@
       background: #fff;
       display: none;
     }
+    .notice-list, .backup-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .notice-item, .backup-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf8;
+    }
+    .notice-item.warning { border-color: #dfc997; background: #fff5df; }
+    .notice-item.danger { border-color: #e1aaa1; background: #fae8e4; }
+    .notice-item small, .backup-item small { display: block; margin-top: 3px; color: var(--muted); }
+    .receipt-link { min-height: 28px; padding: 0 8px; font-size: 12px; }
     .invoice-status {
       min-height: 22px;
       color: var(--muted);
@@ -904,6 +923,8 @@
               <label>帳戶<select id="account" required></select></label>
               <label>商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
               <label class="full">備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
+              <label class="full">收據附件<input id="receiptImage" type="file" accept="image/*" capture="environment"></label>
+              <img id="receiptPreview" class="receipt-preview" alt="收據預覽">
               <button class="btn green full" type="submit">新增記帳</button>
             </form>
             <section class="invoice-box">
@@ -993,6 +1014,11 @@
             <button class="btn small green" type="submit">新增信用卡</button>
           </form>
           <div id="creditList" class="account-list"></div>
+          <div class="manager-block">
+            <h3>本期 / 下期帳單預估</h3>
+            <p class="hint">依結帳日自動將信用卡消費歸入本期或下期，這是消費預估，不會重複建立帳單。</p>
+            <div id="creditCycleSummary" class="account-list"></div>
+          </div>
           <div class="manager-block">
             <h3>信用卡結帳日 / 繳款日</h3>
             <p class="hint">設定每張卡的結帳日與繳款日，之後可用來判斷消費應落在哪個帳單月份。</p>
@@ -1143,7 +1169,7 @@
       <div class="toolbar">
         <div>
           <h2>統計分析</h2>
-          <p class="hint">預設顯示本月，可依月份、類型或關鍵字篩選。</p>
+          <p class="hint">預設顯示本月，可依月份、類型、帳戶、分類、金額或關鍵字篩選。</p>
         </div>
         <div class="filters">
           <input id="monthFilter" type="month">
@@ -1152,10 +1178,16 @@
             <option value="expense">支出</option>
             <option value="income">收入</option>
           </select>
+          <select id="accountFilter"><option value="all">全部帳戶</option></select>
+          <select id="categoryFilter"><option value="all">全部分類</option></select>
+          <input id="minAmountFilter" type="number" min="0" step="1" placeholder="最低金額">
+          <input id="maxAmountFilter" type="number" min="0" step="1" placeholder="最高金額">
           <input id="searchInput" type="search" placeholder="搜尋分類、商家、備註">
         </div>
       </div>
       <div class="cards" id="summaryCards"></div>
+      <article class="panel"><div class="panel-pad"><h3>月結提醒</h3><div id="monthCloseout" class="notice-list"></div></div></article>
+      <div class="chart-grid"><article class="chart-card"><h3>本月預算總覽</h3><div id="budgetOverview" class="bar-list"></div></article></div>
       <article class="panel">
         <div class="panel-pad">
           <h3>分類預算與警示</h3>
@@ -1185,6 +1217,7 @@
         </div>
         <div id="enhancedReports" class="panel-pad"></div>
       </article>
+      <article class="panel"><div class="panel-pad"><h3>雲端月結備份</h3><div id="backupList" class="backup-list"></div></div></article>
       <article class="panel">
         <div class="panel-pad">
           <h3>分析明細</h3>
@@ -1281,14 +1314,23 @@
     const budgetCategorySelect = document.getElementById("budgetCategory");
     const monthFilter = document.getElementById("monthFilter");
     const typeFilter = document.getElementById("typeFilter");
+    const accountFilter = document.getElementById("accountFilter");
+    const categoryFilter = document.getElementById("categoryFilter");
+    const minAmountFilter = document.getElementById("minAmountFilter");
+    const maxAmountFilter = document.getElementById("maxAmountFilter");
     const searchInput = document.getElementById("searchInput");
     const toastEl = document.getElementById("toast");
     const invoicePhoto = document.getElementById("invoicePhoto");
     const invoicePreview = document.getElementById("invoicePreview");
     const invoiceStatus = document.getElementById("invoiceStatus");
+    const receiptImage = document.getElementById("receiptImage");
+    const receiptPreview = document.getElementById("receiptPreview");
     let supabaseClient = null;
     let cloudUser = null;
     let cloudReady = false;
+    let receiptDataUrl = "";
+    let monthlyBackups = [];
+    let autoCloudSaveTimer = 0;
     const defaultCategories = {
       income: ["薪資", "股息", "利息", "獎金", "退款", "現金盤點調整", "其他收入"],
       expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "現金盤點調整", "其他支出"]
@@ -1605,6 +1647,7 @@
     }
     function saveLedger() {
       localStorage.setItem(accountingKey, JSON.stringify(ledger));
+      scheduleCloudBackup();
     }
     function setCloudStatus(text) {
       const el = document.getElementById("cloudStatus");
@@ -1681,12 +1724,18 @@
       cloudReady = true;
       const { data: sessionData } = await supabaseClient.auth.getSession();
       cloudUser = sessionData.session?.user || null;
-      if (cloudUser) rememberCloudDevice(cloudUser);
+      if (cloudUser) {
+        rememberCloudDevice(cloudUser);
+        refreshCloudBackups();
+        ensureMonthlyCloudBackup();
+      }
       supabaseClient.auth.onAuthStateChange((_event, session) => {
         cloudUser = session?.user || null;
         if (session?.user) {
           rememberCloudDevice(session.user);
           cleanCloudAuthUrl();
+          refreshCloudBackups();
+          ensureMonthlyCloudBackup();
         } else if (_event === "SIGNED_OUT") {
           localStorage.removeItem(trustedDeviceKey);
         }
@@ -1728,24 +1777,74 @@
       if (error) throw error;
       return row?.data || {};
     }
-    async function saveCloudData() {
+    function cloneLedgerSnapshot(source = ledger) {
+      return JSON.parse(JSON.stringify(source));
+    }
+    function normalizeMonthlyBackups(saved) {
+      return (Array.isArray(saved) ? saved : [])
+        .filter(row => row && /^\d{4}-\d{2}$/.test(String(row.month || "")) && row.ledger)
+        .map(row => ({ month: String(row.month), savedAt: String(row.savedAt || ""), ledger: row.ledger }))
+        .sort((a, b) => b.month.localeCompare(a.month))
+        .slice(0, 6);
+    }
+    function buildMonthlyBackups(existing, snapshot = ledger) {
+      const month = monthOf();
+      const next = normalizeMonthlyBackups(existing).filter(row => row.month !== month);
+      next.push({ month, savedAt: new Date().toISOString(), ledger: cloneLedgerSnapshot(snapshot) });
+      return normalizeMonthlyBackups(next);
+    }
+    function scheduleCloudBackup() {
+      clearTimeout(autoCloudSaveTimer);
+      if (!supabaseClient || !cloudUser) return;
+      autoCloudSaveTimer = setTimeout(() => saveCloudData({ silent: true }), 1800);
+    }
+    async function refreshCloudBackups() {
+      if (!supabaseClient || !cloudUser) return;
+      try {
+        const payload = await readCloudProfile();
+        monthlyBackups = normalizeMonthlyBackups(payload.accountingMonthlyBackups);
+        renderBackupList();
+      } catch {}
+    }
+    async function ensureMonthlyCloudBackup() {
+      if (!supabaseClient || !cloudUser) return;
+      try {
+        const existing = await readCloudProfile();
+        const backups = normalizeMonthlyBackups(existing.accountingMonthlyBackups);
+        if (backups.some(row => row.month === monthOf())) {
+          monthlyBackups = backups;
+          renderBackupList();
+          return;
+        }
+        monthlyBackups = buildMonthlyBackups(backups, existing.accountingLedger || ledger);
+        const { error } = await supabaseClient
+          .from(cloudTable)
+          .upsert({ user_id: cloudUser.id, data: { ...existing, accountingMonthlyBackups: monthlyBackups } }, { onConflict: "user_id" });
+        if (error) throw error;
+        renderBackupList();
+      } catch {}
+    }
+    async function saveCloudData({ silent = false } = {}) {
       if (!supabaseClient || !cloudUser) {
-        toast("請先登入雲端同步");
+        if (!silent) toast("請先登入雲端同步");
         return;
       }
       try {
         const existing = await readCloudProfile();
+        monthlyBackups = buildMonthlyBackups(existing.accountingMonthlyBackups);
         const payload = {
           ...existing,
-          accountingLedger: ledger
+          accountingLedger: ledger,
+          accountingMonthlyBackups: monthlyBackups
         };
         const { error } = await supabaseClient
           .from(cloudTable)
           .upsert({ user_id: cloudUser.id, data: payload }, { onConflict: "user_id" });
         if (error) throw error;
-        toast("記帳資料已儲存到雲端");
+        renderBackupList();
+        if (!silent) toast("記帳資料已儲存到雲端，並更新本月備份");
       } catch (error) {
-        toast(`雲端儲存失敗：${error.message}`);
+        if (!silent) toast(`雲端儲存失敗：${error.message}`);
       }
     }
     async function loadCloudData() {
@@ -1760,6 +1859,7 @@
           return;
         }
         ledger = hydrateLedger(payload.accountingLedger);
+        monthlyBackups = normalizeMonthlyBackups(payload.accountingMonthlyBackups);
         saveLedger();
         render();
         toast("已載入雲端記帳資料");
@@ -1833,6 +1933,7 @@
       renderCreditBillOptions();
       renderInstallmentOptions();
       renderUtilityOptions();
+      renderAnalysisFilterOptions();
       document.getElementById("categoryPills").innerHTML = (ledger.categories[currentType] || []).map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-category="${escapeHtml(item)}">×</button></span>`).join("");
       const currentCategory = itemCategorySelect.value || categories[0] || "";
       const items = currentCategory ? (ledger.items?.[currentType]?.[currentCategory] || []) : [];
@@ -1840,6 +1941,16 @@
         ? `<span class="pill">${escapeHtml(currentCategory)}</span>` + (items.map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-item="${escapeHtml(item)}">×</button></span>`).join("") || `<span class="pill">尚未建立項目</span>`)
         : `<span class="pill">請先建立分類</span>`;
       renderAccounts();
+    }
+    function renderAnalysisFilterOptions() {
+      const selectedAccount = accountFilter.value;
+      const selectedCategory = categoryFilter.value;
+      const accounts = ledger.accounts.map(account => account.name);
+      const categories = [...new Set([...ledger.categories.income, ...ledger.categories.expense])].sort();
+      accountFilter.innerHTML = [`<option value="all">全部帳戶</option>`, ...accounts.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)].join("");
+      categoryFilter.innerHTML = [`<option value="all">全部分類</option>`, ...categories.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)].join("");
+      if (selectedAccount && (selectedAccount === "all" || accounts.includes(selectedAccount))) accountFilter.value = selectedAccount;
+      if (selectedCategory && (selectedCategory === "all" || categories.includes(selectedCategory))) categoryFilter.value = selectedCategory;
     }
     function getAccountTypeOptions() {
       return normalizeList([
@@ -1933,10 +2044,18 @@
     function filteredEntries() {
       const month = monthFilter.value;
       const type = typeFilter.value;
+      const account = accountFilter.value;
+      const category = categoryFilter.value;
+      const minAmount = Number(minAmountFilter.value) || 0;
+      const maxAmount = Number(maxAmountFilter.value) || 0;
       const keyword = searchInput.value.trim().toLowerCase();
       return allEntryRows()
         .filter(row => !month || String(row.date || "").startsWith(month))
         .filter(row => type === "all" || row.type === type)
+        .filter(row => account === "all" || row.account === account)
+        .filter(row => category === "all" || row.category === category)
+        .filter(row => !minAmount || Number(row.amount) >= minAmount)
+        .filter(row => !maxAmount || Number(row.amount) <= maxAmount)
         .filter(row => {
           if (!keyword) return true;
           return [row.category, row.item, row.account, row.merchant, row.note].some(value => String(value || "").toLowerCase().includes(keyword));
@@ -1996,8 +2115,27 @@
           <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立信用卡</div>`;
+      renderCreditCycleSummary();
       renderInstallments();
       renderCreditBills();
+    }
+    function creditStatementMonth(account, date) {
+      const baseMonth = monthOf(date || today());
+      const day = Number(String(date || today()).slice(8, 10)) || 1;
+      return account?.statementDay && day > account.statementDay ? shiftMonth(baseMonth, 1) : baseMonth;
+    }
+    function renderCreditCycleSummary() {
+      const target = document.getElementById("creditCycleSummary");
+      const cards = ledger.accounts.filter(account => account.type === "信用卡");
+      const current = monthOf();
+      const next = shiftMonth(current, 1);
+      target.innerHTML = cards.length ? cards.map(card => {
+        const rows = allEntryRows().filter(row => row.type === "expense" && row.account === card.name);
+        const currentAmount = sum(rows.filter(row => creditStatementMonth(card, row.date) === current), row => row.amount);
+        const nextAmount = sum(rows.filter(row => creditStatementMonth(card, row.date) === next), row => row.amount);
+        const cycleText = card.statementDay ? `結帳日 ${card.statementDay} 日` : "尚未設定結帳日";
+        return `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(card.name)}</strong><small>${cycleText}｜${current} 預估 ${money(currentAmount)}｜${next} 預估 ${money(nextAmount)}</small></div><span class="account-balance">${money(currentAmount)} ${escapeHtml(card.currency)}</span></div>`;
+      }).join("") : `<div class="empty">先建立信用卡並設定結帳日，即可顯示帳期預估。</div>`;
     }
     function renderInstallments() {
       const rows = [...(ledger.creditInstallments || [])]
@@ -2110,7 +2248,7 @@
         return;
       }
       document.getElementById(target).innerHTML = `${prefix}<div class="table-wrap"><table>
-        <thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>帳戶</th><th>商家 / 對象</th><th>備註</th><th>操作</th></tr></thead>
+        <thead><tr><th>日期</th><th>類型</th><th>分類</th><th>項目</th><th>金額</th><th>帳戶</th><th>商家 / 對象</th><th>備註</th><th>收據</th><th>操作</th></tr></thead>
         <tbody>${rows.map(row => {
           const account = ledger.accounts.find(item => item.name === row.account);
           return `<tr>
@@ -2122,6 +2260,7 @@
           <td>${escapeHtml(row.account)}${account ? `<br><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}</small>` : ""}</td>
           <td>${escapeHtml(row.merchant)}</td>
           <td>${escapeHtml(row.note)}</td>
+          <td>${row.receiptDataUrl ? `<button class="btn small blue receipt-link" type="button" data-view-receipt="${escapeHtml(row.id)}">查看</button>` : "-"}</td>
           <td>${row.virtualInstallment ? `<span class="bill-status">分期</span>` : `<button class="btn small dark" type="button" data-delete="${row.id}">刪除</button>`}</td>
         </tr>`;
         }).join("")}</tbody>
@@ -2279,7 +2418,7 @@
     }
     function renderBudgetAlerts(rows) {
       const target = document.getElementById("budgetAlerts");
-      const expenseRows = rows.filter(row => row.type === "expense");
+      const expenseRows = allEntryRows().filter(row => row.type === "expense" && String(row.date || "").startsWith(monthFilter.value || monthOf()));
       target.innerHTML = (ledger.budgets || []).length
         ? ledger.budgets.map(budget => {
           const used = sum(expenseRows.filter(row => row.category === budget.category), row => row.amount);
@@ -2289,6 +2428,48 @@
           return `<div class="budget-alert ${cls}"><strong>${escapeHtml(budget.category)}｜${state}</strong><br>已用 ${money(used)} / 預算 ${money(budget.amount)}（${ratio.toFixed(0)}%） <button type="button" data-remove-budget="${escapeHtml(budget.id)}">刪除</button></div>`;
         }).join("")
         : `<div class="empty">尚未設定分類預算</div>`;
+    }
+    function renderBudgetOverview() {
+      const month = monthFilter.value || monthOf();
+      const expenseRows = allEntryRows().filter(row => row.type === "expense" && String(row.date || "").startsWith(month));
+      const target = document.getElementById("budgetOverview");
+      const rows = (ledger.budgets || []).map(budget => ({
+        label: budget.category,
+        used: sum(expenseRows.filter(row => row.category === budget.category), row => row.amount),
+        amount: budget.amount
+      }));
+      const max = Math.max(1, ...rows.map(row => row.amount));
+      target.innerHTML = rows.length ? rows.map(row => {
+        const remaining = row.amount - row.used;
+        const ratio = Math.min(100, row.used / row.amount * 100);
+        const color = row.used > row.amount ? "var(--red)" : row.used / row.amount >= .8 ? "var(--amber)" : "var(--green)";
+        return `<div class="bar-row"><strong>${escapeHtml(row.label)}</strong><span class="bar-track"><i class="bar-fill" style="--w:${Math.max(4, ratio).toFixed(1)}%;--c:${color}"></i></span><span>${money(Math.max(0, remaining))} 剩餘</span></div>`;
+      }).join("") : `<div class="empty">尚未設定分類預算</div>`;
+    }
+    function renderMonthCloseout() {
+      const target = document.getElementById("monthCloseout");
+      const month = monthOf();
+      const rows = allEntryRows().filter(row => String(row.date || "").startsWith(month));
+      const unpaidBills = (ledger.creditBills || []).filter(row => !row.paid);
+      const missingRecurring = (ledger.recurringRules || []).filter(rule => recurringDatesForMonth(rule, month).some(date => !ledger.entries.some(row => row.recurringId === rule.id && row.date === date)));
+      const overBudget = (ledger.budgets || []).filter(budget => sum(rows.filter(row => row.type === "expense" && row.category === budget.category), row => row.amount) > budget.amount);
+      const backup = monthlyBackups.find(row => row.month === month);
+      const notices = [
+        { title: `${month} 已記錄 ${rows.length} 筆收支`, text: `收入 ${money(sum(rows.filter(row => row.type === "income"), row => row.amount))}｜支出 ${money(sum(rows.filter(row => row.type === "expense"), row => row.amount))}`, cls: "" },
+        { title: missingRecurring.length ? `尚有 ${missingRecurring.length} 筆固定收支未產生` : "固定收支已完成", text: missingRecurring.length ? missingRecurring.map(row => row.name).join("、") : "本月所有符合條件的固定項目都已記錄", cls: missingRecurring.length ? "warning" : "" },
+        { title: unpaidBills.length ? `尚有 ${unpaidBills.length} 筆信用卡帳單待繳` : "目前沒有待繳信用卡帳單", text: unpaidBills.length ? unpaidBills.map(row => `${row.card} ${money(billTotalAmount(row))}`).join("｜") : "", cls: unpaidBills.length ? "warning" : "" },
+        { title: overBudget.length ? `${overBudget.length} 個分類超出預算` : "分類預算正常", text: overBudget.length ? overBudget.map(row => row.category).join("、") : "", cls: overBudget.length ? "danger" : "" },
+        { title: backup ? `${month} 雲端備份已更新` : `${month} 尚未建立雲端備份`, text: backup ? `最近備份：${new Date(backup.savedAt).toLocaleString("zh-TW")}` : "登入雲端後，新增或修改資料會自動建立", cls: backup ? "" : "warning" }
+      ];
+      target.innerHTML = notices.map(row => `<div class="notice-item ${row.cls}"><div><strong>${escapeHtml(row.title)}</strong><small>${escapeHtml(row.text)}</small></div></div>`).join("");
+    }
+    function renderBackupList() {
+      const target = document.getElementById("backupList");
+      if (!cloudUser) {
+        target.innerHTML = `<div class="empty">登入雲端後，新增或修改資料會自動建立每月備份。</div>`;
+        return;
+      }
+      target.innerHTML = monthlyBackups.length ? monthlyBackups.map(row => `<div class="backup-item"><div><strong>${escapeHtml(row.month)} 月結快照</strong><small>${row.savedAt ? `更新於 ${new Date(row.savedAt).toLocaleString("zh-TW")}` : ""}</small></div><button class="btn small blue" type="button" data-restore-backup="${escapeHtml(row.month)}">還原</button></div>`).join("") : `<div class="empty">尚未建立月結備份；下一次雲端同步會自動建立。</div>`;
     }
     function renderEnhancedReports() {
       const rows = allEntryRows();
@@ -2328,6 +2509,9 @@
       renderReconciliations();
       renderRecurringRules();
       renderBudgetAlerts(rows);
+      renderBudgetOverview();
+      renderMonthCloseout();
+      renderBackupList();
       renderEnhancedReports();
     }
     function download(filename, content, type) {
@@ -2383,14 +2567,36 @@
         setInvoiceStatus("辨識失敗，請改用手動輸入。");
       }
     }
+    async function compressReceiptImage(file) {
+      if (!file) return "";
+      const url = URL.createObjectURL(file);
+      try {
+        const image = await new Promise((resolve, reject) => {
+          const node = new Image();
+          node.onload = () => resolve(node);
+          node.onerror = reject;
+          node.src = url;
+        });
+        const maxSide = 960;
+        const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+        canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+        canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+        return canvas.toDataURL("image/jpeg", .65);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
     entryTypeButtons.forEach(button => button.addEventListener("click", () => setType(button.dataset.type)));
-    form.addEventListener("submit", event => {
+    form.addEventListener("submit", async event => {
       event.preventDefault();
       const amount = Number(document.getElementById("amount").value);
       if (!amount) {
         toast("請輸入金額");
         return;
       }
+      const selectedAccount = ledger.accounts.find(account => account.name === accountSelect.value);
       ledger.entries.push({
         id: uid(),
         type: currentType,
@@ -2401,10 +2607,15 @@
         account: accountSelect.value,
         merchant: document.getElementById("merchant").value.trim(),
         note: document.getElementById("note").value.trim(),
+        receiptDataUrl,
+        billMonth: selectedAccount?.type === "信用卡" ? creditStatementMonth(selectedAccount, document.getElementById("date").value || today()) : "",
         createdAt: new Date().toISOString()
       });
       saveLedger();
       form.reset();
+      receiptDataUrl = "";
+      receiptPreview.removeAttribute("src");
+      receiptPreview.style.display = "none";
       document.getElementById("date").value = today();
       setType(currentType);
       render();
@@ -2422,6 +2633,23 @@
         saveLedger();
         render();
         toast("已刪除");
+      }
+      const receipt = event.target.closest("[data-view-receipt]");
+      if (receipt) {
+        const entry = ledger.entries.find(row => row.id === receipt.dataset.viewReceipt);
+        if (entry?.receiptDataUrl) window.open(entry.receiptDataUrl, "_blank", "noopener");
+        return;
+      }
+      const restoreBackup = event.target.closest("[data-restore-backup]");
+      if (restoreBackup) {
+        const backup = monthlyBackups.find(row => row.month === restoreBackup.dataset.restoreBackup);
+        if (backup && confirm(`確定還原 ${backup.month} 的月結備份？目前本機資料會被備份內容取代。`)) {
+          ledger = hydrateLedger(backup.ledger);
+          saveLedger();
+          render();
+          toast(`已還原 ${backup.month} 月結備份`);
+        }
+        return;
       }
       const transferDel = event.target.closest("[data-delete-transfer]");
       if (transferDel && confirm("確定要刪除這筆轉帳？")) {
@@ -2940,11 +3168,31 @@
       invoicePreview.style.display = "block";
       setInvoiceStatus("已選擇發票照片，可按「辨識發票」嘗試自動帶入。");
     });
+    receiptImage.addEventListener("change", async () => {
+      const file = receiptImage.files?.[0];
+      if (!file) {
+        receiptDataUrl = "";
+        receiptPreview.removeAttribute("src");
+        receiptPreview.style.display = "none";
+        return;
+      }
+      try {
+        receiptDataUrl = await compressReceiptImage(file);
+        receiptPreview.src = receiptDataUrl;
+        receiptPreview.style.display = "block";
+      } catch {
+        receiptDataUrl = "";
+        toast("收據圖片處理失敗，請再試一次");
+      }
+    });
     document.getElementById("scanInvoice").addEventListener("click", recognizeInvoice);
     categorySelect.addEventListener("change", refreshLists);
     accountTypeSelect.addEventListener("change", () => renderEntryAccountOptions());
     itemCategorySelect.addEventListener("change", refreshLists);
-    [monthFilter, typeFilter, searchInput].forEach(el => el.addEventListener("input", render));
+    [monthFilter, typeFilter, accountFilter, categoryFilter, minAmountFilter, maxAmountFilter, searchInput].forEach(el => {
+      el.addEventListener("input", render);
+      el.addEventListener("change", render);
+    });
     document.getElementById("exportJson").addEventListener("click", () => download("tsubin-accounting-data.json", JSON.stringify(ledger, null, 2), "application/json"));
     document.getElementById("exportCsv").addEventListener("click", () => {
       const header = ["日期", "類型", "分類", "項目", "金額", "帳戶", "商家/對象", "備註"];
