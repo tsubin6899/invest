@@ -1643,17 +1643,15 @@
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          flowType: "pkce",
           storageKey: "tsubin-assets-auth"
         }
       });
       cloudReady = true;
       const { data: sessionData } = await supabaseClient.auth.getSession();
       cloudUser = sessionData.session?.user || null;
-      cleanCloudAuthUrl();
       supabaseClient.auth.onAuthStateChange((_event, session) => {
         cloudUser = session?.user || null;
-        cleanCloudAuthUrl();
+        if (session?.user) cleanCloudAuthUrl();
         updateCloudControls();
       });
       updateCloudControls();
@@ -1789,6 +1787,15 @@
     }
     function rateText(n) {
       return new Intl.NumberFormat("zh-TW", { minimumFractionDigits: 0, maximumFractionDigits: 6 }).format(Number(n) || 0);
+    }
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, match => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        "\"": "&quot;",
+        "'": "&#39;"
+      }[match]));
     }
     function sum(rows, fn) { return rows.reduce((t, r) => t + fn(r), 0); }
     function normalizeCurrency(value) { return String(value || "TWD").trim().toUpperCase(); }
