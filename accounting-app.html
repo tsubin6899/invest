@@ -37,15 +37,16 @@
     }
     button, input, select, textarea { font: inherit; }
     .app {
-      max-width: 1180px;
-      margin: 0 auto;
-      padding: 18px;
+      width: 100%;
+      min-height: 100vh;
+      padding: 0 0 18px;
     }
     .topbar, .app-header {
       position: sticky;
       top: 0;
       z-index: 10;
-      border-radius: 8px;
+      width: 100%;
+      border-radius: 0;
       color: #fffdf8;
       background: var(--navy);
       box-shadow: var(--shadow);
@@ -59,7 +60,9 @@
       grid-template-columns: 1fr auto;
       gap: 14px;
       align-items: center;
-      padding: 18px;
+      width: min(100%, 1480px);
+      margin: 0 auto;
+      padding: 18px 24px;
       border-bottom: 1px solid rgba(255,255,255,.1);
     }
     .tabs {
@@ -68,7 +71,9 @@
       grid-auto-columns: max-content;
       gap: 8px;
       overflow-x: auto;
-      padding: 12px 14px;
+      width: min(100%, 1480px);
+      margin: 0 auto;
+      padding: 12px 24px 16px;
       scrollbar-width: none;
     }
     .tabs::-webkit-scrollbar { display: none; }
@@ -82,6 +87,23 @@
       font-weight: 800;
       white-space: nowrap;
       cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .tab-icon {
+      width: 18px;
+      height: 18px;
+      display: inline-grid;
+      place-items: center;
+      color: currentColor;
+      font-size: 15px;
+      line-height: 1;
+    }
+    .tab-icon svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2;
     }
     .tab.active {
       color: var(--ink);
@@ -148,7 +170,8 @@
     }
     .view {
       display: none;
-      margin-top: 16px;
+      width: min(100% - 36px, 1480px);
+      margin: 16px auto 0;
     }
     .view.active { display: block; }
     .view-grid {
@@ -444,15 +467,20 @@
     .toast.show { opacity: 1; transform: translateY(0); }
     .mobile-actions { display: none; }
     @media (max-width: 860px) {
-      .app { padding: 10px 10px 94px; }
+      .app { padding: 0 0 94px; }
       .topbar, .app-header {
         grid-template-columns: 1fr;
         border-radius: 0 0 8px 8px;
-        margin: -10px -10px 0;
+        margin: 0;
       }
-      .brand-row { grid-template-columns: 1fr; }
+      .brand-row {
+        grid-template-columns: 1fr;
+        padding: 16px 16px 12px;
+      }
+      .tabs { padding: 10px 14px 14px; }
       h1 { font-size: 26px; }
       .top-actions { justify-content: flex-start; }
+      .view { width: calc(100% - 20px); margin-top: 14px; }
       .layout, .view-grid { grid-template-columns: 1fr; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
@@ -672,6 +700,7 @@
   </nav>
   <div class="toast" id="toast"></div>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
     const accountingTabs = [
@@ -681,6 +710,20 @@
       ["categoryView", "分類設定"],
       ["analyticsView", "統計分析"]
     ];
+    const tabIcons = {
+      entryView: "receipt-text",
+      accountView: "wallet-cards",
+      creditView: "credit-card",
+      categoryView: "tags",
+      analyticsView: "chart-no-axes-combined"
+    };
+    const tabGlyphs = {
+      entryView: "收",
+      accountView: "戶",
+      creditView: "卡",
+      categoryView: "類",
+      analyticsView: "圖"
+    };
     const entryTypeButtons = [...document.querySelectorAll("[data-type]")];
     const form = document.getElementById("entryForm");
     const categorySelect = document.getElementById("category");
@@ -804,8 +847,9 @@
     }
     function renderTabs() {
       document.getElementById("accountingTabs").innerHTML = accountingTabs
-        .map(([id, label]) => `<button type="button" class="tab ${id === currentView ? "active" : ""}" data-view="${id}">${label}</button>`)
+        .map(([id, label]) => `<button type="button" class="tab ${id === currentView ? "active" : ""}" data-view="${id}"><i class="tab-icon" data-lucide="${tabIcons[id] || "circle"}" aria-hidden="true">${tabGlyphs[id] || ""}</i><span>${label}</span></button>`)
         .join("");
+      if (window.lucide) window.lucide.createIcons();
       document.querySelectorAll(".view").forEach(view => view.classList.toggle("active", view.id === currentView));
     }
     function switchView(id) {
