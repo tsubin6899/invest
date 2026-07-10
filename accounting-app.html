@@ -257,8 +257,15 @@
       margin-top: 16px;
     }
     .manager-block {
-      padding-top: 14px;
-      border-top: 1px solid var(--line);
+      margin-top: 22px;
+      padding: 18px 14px 2px;
+      border-top: 2px solid #c9d5dc;
+      border-radius: 8px 8px 0 0;
+      background: rgba(243,239,230,.48);
+    }
+    .manager-block > h3 {
+      padding-left: 10px;
+      border-left: 4px solid var(--blue);
     }
     .manager-form {
       display: grid;
@@ -342,20 +349,20 @@
       gap: 8px;
       margin-top: 10px;
     }
-    #accountList, #creditList {
+    #accountList, #creditList, #recurringList {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
-    #accountList .account-tile, #creditList .account-tile {
+    #accountList .account-tile, #creditList .account-tile, #recurringList .account-tile {
       grid-template-columns: minmax(0, 1fr) auto;
       align-content: space-between;
       min-height: 112px;
     }
-    #accountList .account-meta, #creditList .account-meta { grid-column: 1 / -1; }
-    #accountList .account-balance, #creditList .account-balance {
+    #accountList .account-meta, #creditList .account-meta, #recurringList .account-meta { grid-column: 1 / -1; }
+    #accountList .account-balance, #creditList .account-balance, #recurringList .account-balance {
       align-self: end;
       text-align: left;
     }
-    #accountList .account-actions, #creditList .account-actions {
+    #accountList .account-actions, #creditList .account-actions, #recurringList .account-actions {
       align-self: end;
       justify-content: flex-end;
     }
@@ -815,12 +822,12 @@
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
-      #accountList, #creditList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      #accountList .account-tile, #creditList .account-tile { min-height: 126px; gap: 7px; padding: 9px; }
-      #accountList .account-meta strong, #creditList .account-meta strong { overflow-wrap: anywhere; }
-      #accountList .account-meta small, #creditList .account-meta small { font-size: 11px; line-height: 1.35; }
-      #accountList .account-balance, #creditList .account-balance { font-size: 13px; }
-      #accountList .account-actions, #creditList .account-actions { width: auto; }
+      #accountList, #creditList, #recurringList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #accountList .account-tile, #creditList .account-tile, #recurringList .account-tile { min-height: 126px; gap: 7px; padding: 9px; }
+      #accountList .account-meta strong, #creditList .account-meta strong, #recurringList .account-meta strong { overflow-wrap: anywhere; }
+      #accountList .account-meta small, #creditList .account-meta small, #recurringList .account-meta small { font-size: 11px; line-height: 1.35; }
+      #accountList .account-balance, #creditList .account-balance, #recurringList .account-balance { font-size: 13px; }
+      #accountList .account-actions, #creditList .account-actions, #recurringList .account-actions { width: auto; }
       .transfer-summary { grid-template-columns: 1fr; }
       .account-tile {
         grid-template-columns: minmax(0, 1fr);
