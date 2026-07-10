@@ -1156,6 +1156,11 @@
     accountTypeSelect.id = "accountType";
     accountTypeLabel.appendChild(accountTypeSelect);
     accountSelect.closest("label")?.before(accountTypeLabel);
+    const newAccountTypeSelect = document.getElementById("newAccountType");
+    if (newAccountTypeSelect && ![...newAccountTypeSelect.options].some(option => option.value === "外幣銀行帳戶")) {
+      const foreignBankOption = new Option("外幣銀行帳戶", "外幣銀行帳戶");
+      newAccountTypeSelect.add(foreignBankOption, newAccountTypeSelect.options[3] || null);
+    }
     const transferForm = document.getElementById("transferForm");
     const transferFromSelect = document.getElementById("transferFrom");
     const transferToSelect = document.getElementById("transferTo");
@@ -1642,6 +1647,25 @@
         ? `<span class="pill">${escapeHtml(currentCategory)}</span>` + (items.map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-item="${escapeHtml(item)}">×</button></span>`).join("") || `<span class="pill">尚未建立項目</span>`)
         : `<span class="pill">請先建立分類</span>`;
       renderAccounts();
+    }
+    function getAccountTypeOptions() {
+      return normalizeList([
+        ...accountTypes,
+        ...ledger.accounts.map(account => account.type).filter(Boolean)
+      ], accountTypes);
+    }
+    function renderEntryAccountOptions(preferredAccount = "") {
+      const currentAccount = preferredAccount || accountSelect.value;
+      const currentAccountRow = ledger.accounts.find(account => account.name === currentAccount);
+      const selectedType = accountTypeSelect.value || currentAccountRow?.type || "";
+      const types = getAccountTypeOptions();
+      accountTypeSelect.innerHTML = types.map(type => `<option value="${escapeHtml(type)}">${escapeHtml(type)}</option>`).join("");
+      if (selectedType && types.includes(selectedType)) accountTypeSelect.value = selectedType;
+      else accountTypeSelect.value = types[0] || "";
+      let accounts = ledger.accounts.filter(account => account.type === accountTypeSelect.value);
+      if (!accounts.length) accounts = ledger.accounts;
+      accountSelect.innerHTML = accounts.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.currency)}</option>`).join("");
+      if (currentAccount && accounts.some(account => account.name === currentAccount)) accountSelect.value = currentAccount;
     }
     function renderAccountOptions(select, selectedValue, allowEmpty = false) {
       if (!select) return;
@@ -2681,6 +2705,7 @@
     });
     document.getElementById("scanInvoice").addEventListener("click", recognizeInvoice);
     categorySelect.addEventListener("change", refreshLists);
+    accountTypeSelect.addEventListener("change", () => renderEntryAccountOptions());
     itemCategorySelect.addEventListener("change", refreshLists);
     [monthFilter, typeFilter, searchInput].forEach(el => el.addEventListener("input", render));
     document.getElementById("exportJson").addEventListener("click", () => download("tsubin-accounting-data.json", JSON.stringify(ledger, null, 2), "application/json"));
