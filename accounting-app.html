@@ -897,6 +897,28 @@
     }
     .number { font-weight: 500; }
     .kicker { font-weight: 650; }
+    #accountList .account-balance, #creditList .account-balance {
+      font-size: 16px;
+      font-weight: 650;
+    }
+    .account-actions button[data-remove-account] {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      min-width: 32px;
+      height: 30px;
+      padding: 0;
+      border: 1px solid #dfb6ae;
+      border-radius: 6px;
+      color: var(--red);
+      background: #fff7f5;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1;
+    }
+    @media (max-width: 860px) {
+      #accountList .account-balance, #creditList .account-balance { font-size: 15px; }
+    }
   </style>
 </head>
 <body>
@@ -2125,7 +2147,7 @@
         return `<div class="account-tile">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
           <span class="account-balance">${money(balance)} ${escapeHtml(currency)}${twdText}</span>
-          <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
+          <div class="account-actions"><button type="button" title="刪除帳戶" aria-label="刪除帳戶" data-remove-account="${escapeHtml(account.name)}">刪</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立一般帳戶</div>`;
       renderCreditCards();
@@ -2137,7 +2159,7 @@
         return `<div class="account-tile">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)}｜目前已刷 / 起始 ${money(account.openingBalance)}｜結帳日 ${account.statementDay || "-"}｜繳款日 ${account.paymentDay || "-"}</small></div>
           <span class="account-balance">${money(Math.abs(balance))} ${escapeHtml(account.currency)}</span>
-          <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
+          <div class="account-actions"><button type="button" title="刪除信用卡" aria-label="刪除信用卡" data-remove-account="${escapeHtml(account.name)}">刪</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立信用卡</div>`;
       renderCreditCycleSummary();
