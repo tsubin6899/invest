@@ -1119,6 +1119,12 @@
               <option value="weekly">每週</option>
               <option value="yearly">每年</option>
             </select>
+            <select id="recurringMonth" title="年度月份" disabled>
+              <option value="01">1 月</option><option value="02">2 月</option><option value="03">3 月</option>
+              <option value="04">4 月</option><option value="05">5 月</option><option value="06">6 月</option>
+              <option value="07">7 月</option><option value="08">8 月</option><option value="09">9 月</option>
+              <option value="10">10 月</option><option value="11">11 月</option><option value="12">12 月</option>
+            </select>
             <input id="recurringDay" type="number" min="1" max="31" placeholder="日期；每週用 1-7">
             <select id="recurringEndMode" title="停止方式">
               <option value="unlimited">無限制</option>
@@ -1268,6 +1274,8 @@
     const recurringCategorySelect = document.getElementById("recurringCategory");
     const recurringItemSelect = document.getElementById("recurringItem");
     const recurringAccountSelect = document.getElementById("recurringAccount");
+    const recurringCycleSelect = document.getElementById("recurringCycle");
+    const recurringMonthSelect = document.getElementById("recurringMonth");
     const recurringEndModeSelect = document.getElementById("recurringEndMode");
     const recurringEndDateInput = document.getElementById("recurringEndDate");
     const budgetCategorySelect = document.getElementById("budgetCategory");
@@ -2258,10 +2266,16 @@
     }
     function renderRecurringRules() {
       const target = document.getElementById("recurringList");
-      const cycleLabels = { weekly: "每週", monthly: "每月", yearly: "每年" };
       target.innerHTML = (ledger.recurringRules || []).length
-        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${cycleLabels[row.cycle || "monthly"] || "每月"} ${row.day} 日｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" data-remove-recurring="${escapeHtml(row.id)}">刪除</button></div></div>`).join("")
+        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${recurringScheduleLabel(row)}｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" data-remove-recurring="${escapeHtml(row.id)}">刪除</button></div></div>`).join("")
         : `<div class="empty">尚未建立固定收支</div>`;
+    }
+    function recurringScheduleLabel(rule) {
+      if (rule.cycle === "yearly") {
+        const month = Number(String(rule.startMonth || rule.createdAt || monthOf()).slice(5, 7)) || 1;
+        return `每年 ${month} 月 ${rule.day} 日`;
+      }
+      return `${rule.cycle === "weekly" ? "每週" : "每月"} ${rule.day} 日`;
     }
     function renderBudgetAlerts(rows) {
       const target = document.getElementById("budgetAlerts");
@@ -2760,8 +2774,13 @@
       recurringEndDateInput.disabled = !hasEndDate;
       if (!hasEndDate) recurringEndDateInput.value = "";
     }
+    function updateRecurringScheduleFields() {
+      const isYearly = recurringCycleSelect.value === "yearly";
+      recurringMonthSelect.disabled = !isYearly;
+    }
     recurringTypeSelect.addEventListener("change", renderUtilityOptions);
     recurringCategorySelect.addEventListener("change", renderUtilityOptions);
+    recurringCycleSelect.addEventListener("change", updateRecurringScheduleFields);
     recurringEndModeSelect.addEventListener("change", updateRecurringEndDate);
     document.getElementById("recurringForm").addEventListener("submit", event => {
       event.preventDefault();
@@ -2780,14 +2799,16 @@
         category: recurringCategorySelect.value,
         item: recurringItemSelect.value || "",
         account: recurringAccountSelect.value,
-        cycle: document.getElementById("recurringCycle").value || "monthly",
+        cycle: recurringCycleSelect.value || "monthly",
         day: Math.min(31, Math.max(1, Number(document.getElementById("recurringDay").value) || 1)),
         endDate: recurringEndModeSelect.value === "end-date" ? recurringEndDateInput.value || "" : "",
-        startMonth: monthOf(),
+        startMonth: recurringCycleSelect.value === "yearly" ? `${monthOf().slice(0, 4)}-${recurringMonthSelect.value}` : monthOf(),
         createdAt: new Date().toISOString()
       });
       document.getElementById("recurringForm").reset();
+      recurringMonthSelect.value = monthOf().slice(5, 7);
       updateRecurringEndDate();
+      updateRecurringScheduleFields();
       saveLedger();
       render();
       toast("已新增固定收支");
@@ -2991,7 +3012,9 @@
     document.getElementById("installmentStartMonth").value = monthOf();
     document.getElementById("billMonth").value = monthOf();
     monthFilter.value = monthOf();
+    recurringMonthSelect.value = monthOf().slice(5, 7);
     updateRecurringEndDate();
+    updateRecurringScheduleFields();
     loadSharedFxRates();
     setType("expense");
     render();
