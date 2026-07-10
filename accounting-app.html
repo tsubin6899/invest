@@ -277,8 +277,8 @@
     }
     .account-tile {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, auto) auto;
+      gap: 10px;
       align-items: center;
       padding: 10px;
       border: 1px solid var(--line);
@@ -294,9 +294,21 @@
       margin-top: 3px;
       color: var(--muted);
     }
+    .account-meta {
+      min-width: 0;
+    }
+    .account-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      min-width: 0;
+    }
     .account-balance {
       font-weight: 850;
       text-align: right;
+      white-space: nowrap;
+      font-variant-numeric: tabular-nums;
     }
     label {
       display: grid;
@@ -453,6 +465,21 @@
     .calendar-panel {
       margin-top: 16px;
     }
+    .transfer-summary {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .transfer-tip {
+      margin-top: 14px;
+      padding: 12px;
+      border: 1px solid #dfc997;
+      border-radius: 8px;
+      background: #fff5df;
+      color: #635139;
+      line-height: 1.55;
+    }
     .calendar-head {
       display: flex;
       align-items: center;
@@ -593,6 +620,15 @@
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
+      .transfer-summary { grid-template-columns: 1fr; }
+      .account-tile {
+        grid-template-columns: minmax(0, 1fr);
+        align-items: start;
+      }
+      .account-actions {
+        width: 100%;
+        justify-content: space-between;
+      }
       .ledger-calendar { gap: 5px; }
       .ledger-day, .ledger-day.empty {
         min-height: 88px;
@@ -610,7 +646,7 @@
         bottom: calc(8px + env(safe-area-inset-bottom));
         z-index: 15;
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 6px;
         padding: 7px;
         border: 1px solid rgba(23,32,51,.18);
@@ -730,6 +766,41 @@
       </article>
     </section>
 
+    <section class="view" id="transferView">
+      <div class="view-grid">
+        <aside class="panel">
+          <div class="panel-pad">
+            <h2>帳戶轉帳</h2>
+            <p class="hint">現金、銀行、外幣現金、行動支付與信用卡還款都可以在這裡記錄；轉帳不會列入收入支出統計。</p>
+            <form id="transferForm" class="form-grid">
+              <label>日期<input id="transferDate" type="date" required></label>
+              <label>轉出帳戶<select id="transferFrom" required></select></label>
+              <label>轉出金額<input id="transferFromAmount" type="number" min="0" step="1" inputmode="decimal" required></label>
+              <label>轉入帳戶<select id="transferTo" required></select></label>
+              <label>轉入金額<input id="transferToAmount" type="number" min="0" step="1" inputmode="decimal" required></label>
+              <label>手續費<input id="transferFee" type="number" min="0" step="1" inputmode="decimal" placeholder="可留空"></label>
+              <label>手續費帳戶<select id="transferFeeAccount"></select></label>
+              <label class="full">備註<textarea id="transferNote" placeholder="例如：台新轉玉山、TWD 換 USD、信用卡還款"></textarea></label>
+              <button class="btn green full" type="submit">新增轉帳</button>
+            </form>
+            <div class="transfer-tip">
+              如果錢包現金對不上，建議到「收入支出」補一筆分類為「現金盤點調整」的支出或收入；這樣不會混淆成轉帳，也能留下差額原因。
+            </div>
+          </div>
+        </aside>
+        <section>
+          <div class="toolbar">
+            <div>
+              <h2>近期轉帳</h2>
+              <p class="hint">最新轉帳會排在最上方，刪除後會同步回復帳戶餘額。</p>
+            </div>
+          </div>
+          <div class="transfer-summary" id="transferSummary"></div>
+          <article class="panel"><div id="transferTable"></div></article>
+        </section>
+      </div>
+    </section>
+
     <section class="view" id="categoryView">
       <div class="view-grid">
         <article class="panel">
@@ -813,6 +884,7 @@
   </main>
   <nav class="mobile-actions" aria-label="手機快速操作">
     <button class="btn green" type="button" data-view="entryView">新增</button>
+    <button class="btn blue" type="button" data-view="transferView">轉帳</button>
     <button class="btn blue" type="button" data-view="analyticsView">統計</button>
     <a class="btn dark" href="personal-assets-dashboard.html">儀表板</a>
   </nav>
@@ -825,6 +897,7 @@
       ["entryView", "收入支出"],
       ["accountView", "帳戶設定"],
       ["creditView", "信用卡設定"],
+      ["transferView", "帳戶轉帳"],
       ["categoryView", "分類設定"],
       ["analyticsView", "統計分析"]
     ];
@@ -832,6 +905,7 @@
       entryView: "receipt-text",
       accountView: "wallet-cards",
       creditView: "credit-card",
+      transferView: "arrow-left-right",
       categoryView: "tags",
       analyticsView: "chart-no-axes-combined"
     };
@@ -839,6 +913,7 @@
       entryView: "收",
       accountView: "戶",
       creditView: "卡",
+      transferView: "轉",
       categoryView: "類",
       analyticsView: "圖"
     };
@@ -849,6 +924,10 @@
     const itemCategorySelect = document.getElementById("itemCategory");
     const accountSelect = document.getElementById("account");
     const methodSelect = document.getElementById("method");
+    const transferForm = document.getElementById("transferForm");
+    const transferFromSelect = document.getElementById("transferFrom");
+    const transferToSelect = document.getElementById("transferTo");
+    const transferFeeAccountSelect = document.getElementById("transferFeeAccount");
     const monthFilter = document.getElementById("monthFilter");
     const typeFilter = document.getElementById("typeFilter");
     const searchInput = document.getElementById("searchInput");
@@ -857,21 +936,23 @@
     const invoicePreview = document.getElementById("invoicePreview");
     const invoiceStatus = document.getElementById("invoiceStatus");
     const defaultCategories = {
-      income: ["薪資", "股息", "利息", "獎金", "退款", "其他收入"],
-      expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "其他支出"]
+      income: ["薪資", "股息", "利息", "獎金", "退款", "現金盤點調整", "其他收入"],
+      expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "現金盤點調整", "其他支出"]
     };
     const defaultItems = {
       income: {
         薪資: ["本薪", "加班費", "津貼"],
         股息: ["台股股息", "美股股息", "基金配息"],
-        退款: ["購物退款", "信用卡回饋"]
+        退款: ["購物退款", "信用卡回饋"],
+        現金盤點調整: ["現金多出", "補回漏記收入"]
       },
       expense: {
         餐飲: ["早餐", "中餐", "晚餐", "下午茶", "咖啡", "宵夜"],
         交通: ["捷運", "公車", "計程車", "高鐵", "停車", "加油"],
         生活用品: ["日用品", "清潔用品", "衣物", "3C"],
         娛樂: ["電影", "訂閱", "遊戲", "聚餐"],
-        醫療: ["門診", "藥品", "保健品"]
+        醫療: ["門診", "藥品", "保健品"],
+        現金盤點調整: ["現金短少", "補記漏掉支出"]
       }
     };
     const defaultMethods = ["現金", "信用卡", "轉帳", "行動支付", "其他"];
@@ -907,8 +988,10 @@
       try {
         const saved = JSON.parse(localStorage.getItem(accountingKey) || "{}");
         const entries = Array.isArray(saved.entries) ? saved.entries : [];
+        const transfers = normalizeTransfers(saved.transfers);
         return {
           entries,
+          transfers,
           categories: {
             income: normalizeList(saved.categories?.income, [...defaultCategories.income, ...entries.filter(row => row.type === "income").map(row => row.category)]),
             expense: normalizeList(saved.categories?.expense, [...defaultCategories.expense, ...entries.filter(row => row.type !== "income").map(row => row.category)])
@@ -920,6 +1003,7 @@
       } catch {
         return {
           entries: [],
+          transfers: [],
           categories: structuredClone(defaultCategories),
           items: structuredClone(defaultItems),
           accounts: structuredClone(defaultAccounts),
@@ -959,6 +1043,20 @@
         currency: String(row.currency || "TWD").trim().toUpperCase(),
         openingBalance: Number(row.openingBalance) || 0
       })).filter(row => row.name && !seen.has(row.name) && seen.add(row.name));
+    }
+    function normalizeTransfers(saved) {
+      return (Array.isArray(saved) ? saved : []).map(row => ({
+        id: row.id || uid(),
+        date: row.date || today(),
+        fromAccount: String(row.fromAccount || "").trim(),
+        toAccount: String(row.toAccount || "").trim(),
+        fromAmount: Number(row.fromAmount) || 0,
+        toAmount: Number(row.toAmount) || 0,
+        feeAmount: Number(row.feeAmount) || 0,
+        feeAccount: String(row.feeAccount || "").trim(),
+        note: String(row.note || "").trim(),
+        createdAt: row.createdAt || new Date().toISOString()
+      })).filter(row => row.fromAccount && row.toAccount && row.fromAmount > 0 && row.toAmount > 0);
     }
     function saveLedger() {
       localStorage.setItem(accountingKey, JSON.stringify(ledger));
@@ -1002,6 +1100,9 @@
       const selectedAccount = accountSelect.value;
       accountSelect.innerHTML = ledger.accounts.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.type)}｜${escapeHtml(account.currency)}</option>`).join("");
       if (selectedAccount && ledger.accounts.some(account => account.name === selectedAccount)) accountSelect.value = selectedAccount;
+      renderAccountOptions(transferFromSelect, transferFromSelect.value);
+      renderAccountOptions(transferToSelect, transferToSelect.value);
+      renderAccountOptions(transferFeeAccountSelect, transferFeeAccountSelect.value, true);
       const selectedMethod = methodSelect.value;
       methodSelect.innerHTML = ledger.methods.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
       if (selectedMethod && ledger.methods.includes(selectedMethod)) methodSelect.value = selectedMethod;
@@ -1013,6 +1114,15 @@
         : `<span class="pill">請先建立分類</span>`;
       document.getElementById("methodPills").innerHTML = ledger.methods.map(item => `<span class="pill">${escapeHtml(item)}<button type="button" data-remove-method="${escapeHtml(item)}">×</button></span>`).join("");
       renderAccounts();
+    }
+    function renderAccountOptions(select, selectedValue, allowEmpty = false) {
+      if (!select) return;
+      const options = [
+        ...(allowEmpty ? [`<option value="">同轉出帳戶</option>`] : []),
+        ...ledger.accounts.map(account => `<option value="${escapeHtml(account.name)}">${escapeHtml(account.name)}｜${escapeHtml(account.type)}｜${escapeHtml(account.currency)}</option>`)
+      ];
+      select.innerHTML = options.join("");
+      if (selectedValue && ledger.accounts.some(account => account.name === selectedValue)) select.value = selectedValue;
     }
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
@@ -1042,19 +1152,31 @@
       return [...grouped.entries()].map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value);
     }
     function accountBalance(account) {
-      return ledger.entries.reduce((total, row) => {
+      const entryTotal = ledger.entries.reduce((total, row) => {
         if (row.account !== account.name) return total;
         const amount = Number(row.amount) || 0;
         return total + (row.type === "income" ? amount : -amount);
       }, Number(account.openingBalance) || 0);
+      return (ledger.transfers || []).reduce((total, row) => {
+        const fromAmount = Number(row.fromAmount) || 0;
+        const toAmount = Number(row.toAmount) || 0;
+        const feeAmount = Number(row.feeAmount) || 0;
+        const feeAccount = row.feeAccount || row.fromAccount;
+        let next = total;
+        if (row.fromAccount === account.name) next -= fromAmount;
+        if (row.toAccount === account.name) next += toAmount;
+        if (feeAmount && feeAccount === account.name) next -= feeAmount;
+        return next;
+      }, entryTotal);
     }
     function renderAccounts() {
       const regularAccounts = ledger.accounts.filter(account => account.type !== "信用卡");
       document.getElementById("accountList").innerHTML = regularAccounts.map(account => {
         const balance = accountBalance(account);
         return `<div class="account-tile">
-          <div><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
-          <div><span class="account-balance">${money(balance)} ${escapeHtml(account.currency)}</span><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
+          <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
+          <span class="account-balance">${money(balance)} ${escapeHtml(account.currency)}</span>
+          <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立一般帳戶</div>`;
       renderCreditCards();
@@ -1064,8 +1186,9 @@
       document.getElementById("creditList").innerHTML = creditCards.map(account => {
         const balance = accountBalance(account);
         return `<div class="account-tile">
-          <div><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)}｜目前已刷 / 起始 ${money(account.openingBalance)}</small></div>
-          <div><span class="account-balance">${money(Math.abs(balance))} ${escapeHtml(account.currency)}</span><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
+          <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)}｜目前已刷 / 起始 ${money(account.openingBalance)}</small></div>
+          <span class="account-balance">${money(Math.abs(balance))} ${escapeHtml(account.currency)}</span>
+          <div class="account-actions"><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立信用卡</div>`;
     }
@@ -1170,6 +1293,43 @@
         </div>
         <div class="ledger-calendar">${cells.join("")}</div>`;
     }
+    function sortedTransfers() {
+      return [...(ledger.transfers || [])]
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+    }
+    function renderTransfers() {
+      const rows = sortedTransfers();
+      const month = monthOf();
+      const monthRows = rows.filter(row => String(row.date || "").startsWith(month));
+      const moved = sum(monthRows, row => row.fromAmount);
+      const fees = sum(monthRows, row => row.feeAmount);
+      document.getElementById("transferSummary").innerHTML = [
+        card("本月轉出總額", money(moved), "不列入支出", "dark"),
+        card("本月手續費", money(fees), "會從帳戶扣除"),
+        card("轉帳筆數", money(monthRows.length, ""), `${month} 期間`, "accent")
+      ].join("");
+      const target = document.getElementById("transferTable");
+      if (!rows.length) {
+        target.innerHTML = `<div class="empty">目前沒有轉帳紀錄</div>`;
+        return;
+      }
+      target.innerHTML = `<div class="table-wrap"><table>
+        <thead><tr><th>日期</th><th>轉出</th><th>轉入</th><th>手續費</th><th>備註</th><th>操作</th></tr></thead>
+        <tbody>${rows.map(row => {
+          const fromAccount = ledger.accounts.find(account => account.name === row.fromAccount);
+          const toAccount = ledger.accounts.find(account => account.name === row.toAccount);
+          const feeAccount = row.feeAccount || row.fromAccount;
+          return `<tr>
+            <td>${escapeHtml(row.date)}</td>
+            <td>${escapeHtml(row.fromAccount)}<br><small>-${money(row.fromAmount)} ${escapeHtml(fromAccount?.currency || "")}</small></td>
+            <td>${escapeHtml(row.toAccount)}<br><small>+${money(row.toAmount)} ${escapeHtml(toAccount?.currency || "")}</small></td>
+            <td>${row.feeAmount ? `${money(row.feeAmount)}｜${escapeHtml(feeAccount)}` : "-"}</td>
+            <td>${escapeHtml(row.note || "")}</td>
+            <td><button class="btn small dark" type="button" data-delete-transfer="${row.id}">刪除</button></td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table></div>`;
+    }
     function render() {
       renderTabs();
       refreshLists();
@@ -1184,6 +1344,7 @@
       renderTable("entryTable", recentRows);
       renderTable("analysisTable", rows);
       renderLedgerCalendar();
+      renderTransfers();
     }
     function download(filename, content, type) {
       const blob = new Blob([content], { type });
@@ -1279,6 +1440,13 @@
         render();
         toast("已刪除");
       }
+      const transferDel = event.target.closest("[data-delete-transfer]");
+      if (transferDel && confirm("確定要刪除這筆轉帳？")) {
+        ledger.transfers = (ledger.transfers || []).filter(row => row.id !== transferDel.dataset.deleteTransfer);
+        saveLedger();
+        render();
+        toast("已刪除轉帳");
+      }
       const scroll = event.target.closest("[data-scroll]");
       if (scroll) document.getElementById(scroll.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" });
       if (event.target.closest("[data-calendar-prev]")) {
@@ -1323,6 +1491,7 @@
       if (removeAccount) {
         const value = removeAccount.dataset.removeAccount;
         if (ledger.entries.some(row => row.account === value) && !confirm("這個帳戶已有記帳紀錄，刪除後舊紀錄仍會保留帳戶名稱。確定刪除？")) return;
+        if ((ledger.transfers || []).some(row => row.fromAccount === value || row.toAccount === value || row.feeAccount === value) && !confirm("這個帳戶已有轉帳紀錄，刪除後舊轉帳仍會保留帳戶名稱。確定刪除？")) return;
         ledger.accounts = ledger.accounts.filter(item => item.name !== value);
         saveLedger();
         render();
@@ -1402,6 +1571,43 @@
       accountSelect.value = name;
       toast("已新增信用卡");
     });
+    transferForm.addEventListener("submit", event => {
+      event.preventDefault();
+      const fromAccount = transferFromSelect.value;
+      const toAccount = transferToSelect.value;
+      const fromAmount = Number(document.getElementById("transferFromAmount").value) || 0;
+      const toAmount = Number(document.getElementById("transferToAmount").value) || 0;
+      if (!fromAccount || !toAccount) {
+        toast("請選擇轉出與轉入帳戶");
+        return;
+      }
+      if (fromAccount === toAccount) {
+        toast("轉出與轉入帳戶不能相同");
+        return;
+      }
+      if (!fromAmount || !toAmount) {
+        toast("請輸入轉帳金額");
+        return;
+      }
+      ledger.transfers = ledger.transfers || [];
+      ledger.transfers.push({
+        id: uid(),
+        date: document.getElementById("transferDate").value || today(),
+        fromAccount,
+        toAccount,
+        fromAmount,
+        toAmount,
+        feeAmount: Number(document.getElementById("transferFee").value) || 0,
+        feeAccount: transferFeeAccountSelect.value || fromAccount,
+        note: document.getElementById("transferNote").value.trim(),
+        createdAt: new Date().toISOString()
+      });
+      saveLedger();
+      transferForm.reset();
+      document.getElementById("transferDate").value = today();
+      render();
+      toast("已新增轉帳");
+    });
     document.getElementById("methodForm").addEventListener("submit", event => {
       event.preventDefault();
       const input = document.getElementById("newMethod");
@@ -1446,6 +1652,7 @@
       }
       ledger = {
         entries: payload.entries,
+        transfers: normalizeTransfers(payload.transfers),
         categories: {
           income: normalizeList(payload.categories?.income, [...defaultCategories.income, ...payload.entries.filter(row => row.type === "income").map(row => row.category)]),
           expense: normalizeList(payload.categories?.expense, [...defaultCategories.expense, ...payload.entries.filter(row => row.type !== "income").map(row => row.category)])
@@ -1463,6 +1670,7 @@
       if (!confirm("確定清空所有記帳資料？")) return;
       ledger = {
         entries: [],
+        transfers: [],
         categories: structuredClone(defaultCategories),
         items: structuredClone(defaultItems),
         accounts: structuredClone(defaultAccounts),
@@ -1473,6 +1681,7 @@
       toast("已清空記帳資料");
     });
     document.getElementById("date").value = today();
+    document.getElementById("transferDate").value = today();
     monthFilter.value = monthOf();
     setType("expense");
     render();
