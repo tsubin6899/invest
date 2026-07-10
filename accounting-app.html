@@ -450,6 +450,69 @@
       color: var(--muted);
       text-align: center;
     }
+    .calendar-panel {
+      margin-top: 16px;
+    }
+    .calendar-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .calendar-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .ledger-calendar {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .weekday {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      text-align: center;
+    }
+    .ledger-day {
+      min-height: 106px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fffdf8;
+      display: grid;
+      align-content: start;
+      gap: 5px;
+    }
+    .ledger-day.empty {
+      min-height: 106px;
+      padding: 10px;
+      border-style: dashed;
+      background: #f7f2e9;
+    }
+    .ledger-day strong {
+      font-size: 14px;
+    }
+    .day-stat {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .day-stat.income span:last-child { color: var(--green); font-weight: 800; }
+    .day-stat.expense span:last-child { color: var(--red); font-weight: 800; }
+    .day-stat.balance span:last-child { color: var(--blue); font-weight: 800; }
+    .day-note {
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: 11px;
+      line-height: 1.35;
+      overflow-wrap: anywhere;
+    }
     .toast {
       position: fixed;
       right: 18px;
@@ -486,6 +549,13 @@
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
+      .ledger-calendar { gap: 5px; }
+      .ledger-day, .ledger-day.empty {
+        min-height: 88px;
+        padding: 7px;
+      }
+      .weekday, .day-stat, .day-note { font-size: 10px; }
+      .ledger-day strong { font-size: 12px; }
       .filters input, .filters select { width: 100%; min-width: 0; }
       .toolbar { align-items: stretch; }
       .filters { width: 100%; }
@@ -569,6 +639,9 @@
             </div>
           </div>
           <article class="panel"><div id="entryTable"></div></article>
+          <article class="panel calendar-panel">
+            <div class="panel-pad" id="ledgerCalendar"></div>
+          </article>
         </section>
       </div>
     </section>
@@ -765,6 +838,7 @@
     ];
     let currentType = "expense";
     let currentView = "entryView";
+    let ledgerCalendarMonth = monthOf();
     let ledger = loadLedger();
 
     function today() {
@@ -773,6 +847,11 @@
     }
     function monthOf(date = today()) {
       return String(date).slice(0, 7);
+    }
+    function shiftMonth(month, delta) {
+      const [year, monthNumber] = month.split("-").map(Number);
+      const date = new Date(year, monthNumber - 1 + delta, 1);
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
     }
     function uid() {
       return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -990,6 +1069,63 @@
         }).join("")}</tbody>
       </table></div>`;
     }
+    function dailySummaryRows(month) {
+      const grouped = new Map();
+      ledger.entries
+        .filter(row => String(row.date || "").startsWith(month))
+        .forEach(row => {
+          const date = row.date;
+          const item = grouped.get(date) || { income: 0, expense: 0, count: 0, labels: [] };
+          const amount = Number(row.amount) || 0;
+          if (row.type === "income") item.income += amount;
+          else item.expense += amount;
+          item.count += 1;
+          if (row.category) item.labels.push(row.item ? `${row.category}/${row.item}` : row.category);
+          grouped.set(date, item);
+        });
+      return grouped;
+    }
+    function renderLedgerCalendar() {
+      const month = ledgerCalendarMonth || monthOf();
+      const daily = dailySummaryRows(month);
+      const first = new Date(`${month}-01T00:00:00`);
+      const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+      const blanks = first.getDay();
+      const cells = [];
+      const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+      weekdays.forEach(day => cells.push(`<div class="weekday">${day}</div>`));
+      for (let i = 0; i < blanks; i++) cells.push(`<div class="ledger-day empty"></div>`);
+      for (let day = 1; day <= days; day++) {
+        const date = `${month}-${String(day).padStart(2, "0")}`;
+        const row = daily.get(date);
+        if (!row) {
+          cells.push(`<div class="ledger-day"><strong>${day}</strong><div class="day-note">尚無紀錄</div></div>`);
+          continue;
+        }
+        const balance = row.income - row.expense;
+        const labels = [...new Set(row.labels)].slice(0, 2).join("、");
+        cells.push(`<div class="ledger-day">
+          <strong>${day}</strong>
+          <div class="day-stat income"><span>收</span><span>${money(row.income)}</span></div>
+          <div class="day-stat expense"><span>支</span><span>${money(row.expense)}</span></div>
+          <div class="day-stat balance"><span>餘</span><span>${balance >= 0 ? "+" : ""}${money(balance)}</span></div>
+          <div class="day-note">${row.count} 筆${labels ? `｜${escapeHtml(labels)}` : ""}</div>
+        </div>`);
+      }
+      document.getElementById("ledgerCalendar").innerHTML = `
+        <div class="calendar-head">
+          <div>
+            <h3>${month} 行事曆總覽</h3>
+            <p class="hint">每個日期格會統計該天收入、支出與結餘。</p>
+          </div>
+          <div class="calendar-actions">
+            <button class="btn small" type="button" data-calendar-prev>上個月</button>
+            <button class="btn small blue" type="button" data-calendar-this>本月</button>
+            <button class="btn small" type="button" data-calendar-next>下個月</button>
+          </div>
+        </div>
+        <div class="ledger-calendar">${cells.join("")}</div>`;
+    }
     function render() {
       renderTabs();
       refreshLists();
@@ -1003,6 +1139,7 @@
       renderBars("methodBars", groupRows(rows, "method"), "var(--green)");
       renderTable("entryTable", recentRows);
       renderTable("analysisTable", rows);
+      renderLedgerCalendar();
     }
     function download(filename, content, type) {
       const blob = new Blob([content], { type });
@@ -1100,6 +1237,18 @@
       }
       const scroll = event.target.closest("[data-scroll]");
       if (scroll) document.getElementById(scroll.dataset.scroll)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (event.target.closest("[data-calendar-prev]")) {
+        ledgerCalendarMonth = shiftMonth(ledgerCalendarMonth || monthOf(), -1);
+        render();
+      }
+      if (event.target.closest("[data-calendar-this]")) {
+        ledgerCalendarMonth = monthOf();
+        render();
+      }
+      if (event.target.closest("[data-calendar-next]")) {
+        ledgerCalendarMonth = shiftMonth(ledgerCalendarMonth || monthOf(), 1);
+        render();
+      }
       const removeCategory = event.target.closest("[data-remove-category]");
       if (removeCategory) {
         const value = removeCategory.dataset.removeCategory;
