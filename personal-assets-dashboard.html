@@ -1031,7 +1031,7 @@
     }
     .brand-row h1 {
       color: #fffdf7;
-      font-size: 30px;
+      font-size: 34px;
       line-height: 1.2;
       white-space: nowrap;
     }
@@ -1123,6 +1123,30 @@
       box-shadow: none;
     }
     .app-header .tab { color: rgba(255,255,255,.78); }
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .tab svg {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      stroke-width: 2.2;
+    }
+    .tab-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      font-size: 14px;
+      line-height: 1;
+    }
+    .app-header .tab svg {
+      color: currentColor;
+      opacity: .92;
+    }
     .app-header .tab.active {
       background: #fffdf7;
       color: #172033;
@@ -1231,7 +1255,7 @@
         width: 100%;
         padding: 12px 12px 10px;
       }
-      .brand-row h1 { font-size: 21px; }
+      .brand-row h1 { font-size: 23px; }
       .brand-row .sub { font-size: 11px; }
       .app-header .tabs {
         width: 100%;
@@ -1313,6 +1337,7 @@
     <section class="view" id="chart"></section>
   </main>
 
+  <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="market-data-config.js"></script>
   <script>
@@ -1325,6 +1350,34 @@
       ["expense", "支出規畫"], ["allocation", "額外資金分配"],
       ["chart", "資訊圖表庫"]
     ];
+    const tabIcons = {
+      overview: "layout-dashboard",
+      tw: "trending-up",
+      us: "line-chart",
+      cash: "wallet",
+      metal: "gem",
+      fund: "pie-chart",
+      dca: "calendar-sync",
+      purchase: "receipt-text",
+      dividend: "badge-dollar-sign",
+      expense: "clipboard-list",
+      allocation: "split",
+      chart: "chart-no-axes-combined"
+    };
+    const tabGlyphs = {
+      overview: "▦",
+      tw: "↗",
+      us: "⌁",
+      cash: "$",
+      metal: "◇",
+      fund: "◔",
+      dca: "↻",
+      purchase: "▤",
+      dividend: "$",
+      expense: "☑",
+      allocation: "⫶",
+      chart: "▥"
+    };
     const seed = {
       rates: { usd: 31.8, goldGram: 2980, silverOz: 1850, reserve: 0 },
       fxRates: { TWD: 1, USD: 31.8, JPY: 0.22, EUR: 34.5, CNY: 4.4, HKD: 4.05 },
@@ -1604,7 +1657,8 @@
     }
     const chartColors = ["#2368d9", "#16a36a", "#d99a21", "#7c3aed", "#e25555", "#0891b2", "#db2777", "#64748b", "#84cc16", "#f97316"];
     function renderTabs() {
-      document.getElementById("tabs").innerHTML = tabs.map(([id, label]) => `<button class="tab ${id === currentTab ? "active" : ""}" data-tab="${id}">${label}</button>`).join("");
+      document.getElementById("tabs").innerHTML = tabs.map(([id, label]) => `<button class="tab ${id === currentTab ? "active" : ""}" data-tab="${id}"><i class="tab-icon" data-lucide="${tabIcons[id] || "circle"}" aria-hidden="true">${tabGlyphs[id] || "•"}</i><span>${label}</span></button>`).join("");
+      if (window.lucide) window.lucide.createIcons();
     }
     function renderPieChart(title, items, totalLabel, currency) {
       const filtered = items.filter(item => Number(item.value) > 0);
