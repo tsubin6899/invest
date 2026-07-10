@@ -2269,7 +2269,12 @@
           categorySelect.value = tpl.category;
           refreshLists();
           itemSelect.value = tpl.item || "";
-          accountSelect.value = tpl.account || accountSelect.value;
+          const tplAccount = ledger.accounts.find(account => account.name === tpl.account);
+          if (tplAccount) {
+            accountTypeSelect.value = tplAccount.type;
+            renderEntryAccountOptions(tpl.account);
+            accountSelect.value = tpl.account;
+          }
           document.getElementById("merchant").value = tpl.merchant || "";
           document.getElementById("entryForm").scrollIntoView({ behavior: "smooth", block: "start" });
         }
@@ -2373,6 +2378,7 @@
     document.getElementById("accountForm").addEventListener("submit", event => {
       event.preventDefault();
       const name = document.getElementById("newAccountName").value.trim();
+      const type = document.getElementById("newAccountType").value;
       if (!name) return;
       if (ledger.accounts.some(account => account.name === name)) {
         toast("帳戶名稱已存在");
@@ -2381,7 +2387,7 @@
       ledger.accounts.push({
         id: uid(),
         name,
-        type: document.getElementById("newAccountType").value,
+        type,
         currency: document.getElementById("newAccountCurrency").value.trim().toUpperCase() || "TWD",
         openingBalance: Number(document.getElementById("newAccountBalance").value) || 0
       });
@@ -2389,6 +2395,8 @@
       document.getElementById("newAccountCurrency").value = "TWD";
       saveLedger();
       render();
+      accountTypeSelect.value = type;
+      renderEntryAccountOptions(name);
       accountSelect.value = name;
       toast("已新增帳戶");
     });
