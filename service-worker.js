@@ -1,16 +1,19 @@
-const CACHE_NAME = "tsubin-assets-dashboard-invest-v3";
+const CACHE_NAME = "tsubin-assets-dashboard-invest-v4";
 const CORE_ASSETS = [
   "./",
   "./index.html",
   "./combined-dashboard.html",
   "./personal-assets-dashboard.html",
   "./accounting-app.html",
+  "./accounting-manifest.webmanifest",
   "./market-data-config.js",
   "./manifest.webmanifest",
   "./latest-prices.json",
   "./latest-rates.json",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/accounting-192.png",
+  "./icons/accounting-512.png"
 ];
 
 self.addEventListener("install", (event) => {

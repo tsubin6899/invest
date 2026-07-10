@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>日常記帳 App｜阿斌 Tsubin</title>
   <meta name="theme-color" content="#142033">
+  <meta name="application-name" content="日常記帳">
+  <meta name="apple-mobile-web-app-title" content="日常記帳">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="accounting-manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/accounting-192.png">
+  <link rel="apple-touch-icon" href="icons/accounting-192.png">
   <style>
     :root {
       --ink: #1f2633;
@@ -34,19 +41,52 @@
       margin: 0 auto;
       padding: 18px;
     }
-    .topbar {
+    .topbar, .app-header {
       position: sticky;
       top: 0;
       z-index: 10;
-      padding: 18px;
       border-radius: 8px;
       color: #fffdf8;
       background: var(--navy);
       box-shadow: var(--shadow);
+    }
+    .topbar { display: none; }
+    .app-header {
+      overflow: hidden;
+    }
+    .brand-row {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 14px;
       align-items: center;
+      padding: 18px;
+      border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    .tabs {
+      display: grid;
+      grid-auto-flow: column;
+      grid-auto-columns: max-content;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 12px 14px;
+      scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab {
+      min-height: 42px;
+      border: 0;
+      border-radius: 8px;
+      padding: 0 14px;
+      color: rgba(255,253,248,.78);
+      background: transparent;
+      font-weight: 800;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .tab.active {
+      color: var(--ink);
+      background: #fffdf8;
+      box-shadow: 0 8px 20px rgba(0,0,0,.16);
     }
     .kicker {
       display: block;
@@ -106,6 +146,17 @@
       margin-top: 16px;
       align-items: start;
     }
+    .view {
+      display: none;
+      margin-top: 16px;
+    }
+    .view.active { display: block; }
+    .view-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 380px) 1fr;
+      gap: 16px;
+      align-items: start;
+    }
     .panel, .card, .chart-card {
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -142,6 +193,28 @@
       grid-template-columns: 1fr auto;
       gap: 8px;
       margin-top: 10px;
+    }
+    .invoice-box {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      display: grid;
+      gap: 10px;
+    }
+    .invoice-preview {
+      width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      display: none;
+    }
+    .invoice-status {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
     }
     .account-form {
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -372,14 +445,15 @@
     .mobile-actions { display: none; }
     @media (max-width: 860px) {
       .app { padding: 10px 10px 94px; }
-      .topbar {
+      .topbar, .app-header {
         grid-template-columns: 1fr;
         border-radius: 0 0 8px 8px;
         margin: -10px -10px 0;
       }
+      .brand-row { grid-template-columns: 1fr; }
       h1 { font-size: 26px; }
       .top-actions { justify-content: flex-start; }
-      .layout { grid-template-columns: 1fr; }
+      .layout, .view-grid { grid-template-columns: 1fr; }
       .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .chart-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
@@ -408,130 +482,190 @@
 </head>
 <body>
   <main class="app">
-    <header class="topbar">
-      <div>
-        <span class="kicker">Daily Ledger</span>
-        <h1>日常記帳 App｜阿斌 Tsubin</h1>
-        <p class="sub">快速記錄收入與支出，並同步提供個人資產儀表板的記帳總覽。</p>
+    <header class="app-header">
+      <div class="brand-row">
+        <div>
+          <span class="kicker">Daily Ledger</span>
+          <h1>日常記帳 App｜阿斌 Tsubin</h1>
+          <p class="sub">收入支出、帳戶、信用卡、分類與統計分析集中管理。</p>
+        </div>
+        <div class="top-actions">
+          <a class="btn light" href="personal-assets-dashboard.html">回資產儀表板</a>
+          <button class="btn purple" id="exportJson" type="button">匯出 JSON</button>
+          <button class="btn blue" id="exportCsv" type="button">匯出 CSV</button>
+          <button class="btn green" id="importButton" type="button">匯入資料</button>
+          <button class="btn dark" id="clearData" type="button">清空</button>
+          <input id="importFile" type="file" accept="application/json" hidden>
+        </div>
       </div>
-      <div class="top-actions">
-        <a class="btn light" href="personal-assets-dashboard.html">回資產儀表板</a>
-        <button class="btn purple" id="exportJson" type="button">匯出 JSON</button>
-        <button class="btn blue" id="exportCsv" type="button">匯出 CSV</button>
-        <button class="btn green" id="importButton" type="button">匯入資料</button>
-        <button class="btn dark" id="clearData" type="button">清空</button>
-        <input id="importFile" type="file" accept="application/json" hidden>
-      </div>
+      <nav class="tabs" id="accountingTabs" aria-label="記帳選單"></nav>
     </header>
 
-    <section class="layout">
-      <aside class="panel">
-        <div class="panel-pad">
-          <h2>快速新增</h2>
-          <p class="hint">日常支出用手機也能快速輸入；資料會保存在此瀏覽器，並讓資產儀表板讀取總覽。</p>
-          <div class="segmented" aria-label="收支類型">
-            <button type="button" class="active" data-type="expense">支出</button>
-            <button type="button" data-type="income">收入</button>
+    <section class="view active" id="entryView">
+      <div class="view-grid">
+        <aside class="panel">
+          <div class="panel-pad">
+            <h2>收入支出</h2>
+            <p class="hint">日常支出用手機也能快速輸入；資料會保存在此瀏覽器，並讓資產儀表板讀取總覽。</p>
+            <div class="segmented" aria-label="收支類型">
+              <button type="button" class="active" data-type="expense">支出</button>
+              <button type="button" data-type="income">收入</button>
+            </div>
+            <form id="entryForm" class="form-grid">
+              <label>日期<input id="date" type="date" required></label>
+              <label>金額<input id="amount" type="number" min="0" step="1" inputmode="decimal" required></label>
+              <label>分類<select id="category" required></select></label>
+              <label>付款帳戶<select id="account" required></select></label>
+              <label>付款方式<select id="method"></select></label>
+              <label>商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
+              <label class="full">備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
+              <button class="btn green full" type="submit">新增記帳</button>
+            </form>
+            <section class="invoice-box">
+              <h3>拍照發票辨識</h3>
+              <p class="hint">可拍照或上傳發票；若瀏覽器支援文字辨識，會嘗試帶入日期、金額與商家。</p>
+              <input id="invoicePhoto" type="file" accept="image/*" capture="environment">
+              <img id="invoicePreview" class="invoice-preview" alt="發票預覽">
+              <button class="btn blue" id="scanInvoice" type="button">辨識發票</button>
+              <div id="invoiceStatus" class="invoice-status">尚未選擇發票照片</div>
+            </section>
           </div>
-          <form id="entryForm" class="form-grid">
-            <label>日期<input id="date" type="date" required></label>
-            <label>金額<input id="amount" type="number" min="0" step="1" inputmode="decimal" required></label>
-            <label>分類<select id="category" required></select></label>
-            <label>付款帳戶<select id="account" required></select></label>
-            <label>付款方式
-              <select id="method"></select>
-            </label>
-            <label>商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
-            <label class="full">備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
-            <button class="btn green full" type="submit">新增記帳</button>
-          </form>
-          <section class="manager-grid" aria-label="自訂設定">
-            <div class="manager-block">
-              <h3>自訂分類</h3>
-              <p class="hint">分類會依收入 / 支出分開管理。</p>
-              <form id="categoryForm" class="manager-form">
-                <input id="newCategory" placeholder="新增分類，例如：咖啡、學費、薪資">
-                <button class="btn small blue" type="submit">新增</button>
-              </form>
-              <div id="categoryPills" class="pill-list"></div>
+        </aside>
+        <section>
+          <div class="toolbar">
+            <div>
+              <h2>近期明細</h2>
+              <p class="hint">最新資料排在最上方，可直接刪除錯誤紀錄。</p>
             </div>
-            <div class="manager-block">
-              <h3>自訂付款帳戶</h3>
-              <p class="hint">可建立現金、外幣現金、銀行帳戶、信用卡與行動支付；記帳時會依指定帳戶自動計算餘額。</p>
-              <form id="accountForm" class="manager-form account-form">
-                <input id="newAccountName" placeholder="帳戶名稱，例如：台新銀行、LINE Pay">
-                <select id="newAccountType">
-                  <option>現金</option>
-                  <option>外幣現金</option>
-                  <option>銀行帳戶</option>
-                  <option>信用卡</option>
-                  <option>行動支付</option>
-                  <option>其他</option>
-                </select>
-                <input id="newAccountCurrency" placeholder="幣別，例如 TWD / USD" value="TWD">
-                <input id="newAccountBalance" type="number" step="1" placeholder="起始餘額">
-                <button class="btn small green" type="submit">新增帳戶</button>
-              </form>
-              <div id="accountList" class="account-list"></div>
-            </div>
-            <div class="manager-block">
-              <h3>自訂付款方式</h3>
-              <form id="methodForm" class="manager-form">
-                <input id="newMethod" placeholder="新增方式，例如：悠遊付、街口、Apple Pay">
-                <button class="btn small purple" type="submit">新增</button>
-              </form>
-              <div id="methodPills" class="pill-list"></div>
-            </div>
-          </section>
-        </div>
-      </aside>
+          </div>
+          <article class="panel"><div id="entryTable"></div></article>
+        </section>
+      </div>
+    </section>
 
-      <section>
-        <div class="toolbar">
-          <div>
-            <h2>月度總覽</h2>
-            <p class="hint">預設顯示本月，可依月份、類型或關鍵字篩選。</p>
-          </div>
-          <div class="filters">
-            <input id="monthFilter" type="month">
-            <select id="typeFilter">
-              <option value="all">全部</option>
-              <option value="expense">支出</option>
-              <option value="income">收入</option>
+    <section class="view" id="accountView">
+      <article class="panel">
+        <div class="panel-pad">
+          <h2>帳戶設定</h2>
+          <p class="hint">可建立現金、外幣現金、銀行帳戶與行動支付；支出會從指定帳戶扣除，收入會加回指定帳戶。</p>
+          <form id="accountForm" class="manager-form account-form">
+            <input id="newAccountName" placeholder="帳戶名稱，例如：台新銀行、LINE Pay">
+            <select id="newAccountType">
+              <option>現金</option>
+              <option>外幣現金</option>
+              <option>銀行帳戶</option>
+              <option>信用卡</option>
+              <option>行動支付</option>
+              <option>其他</option>
             </select>
-            <input id="searchInput" type="search" placeholder="搜尋分類、商家、備註">
-          </div>
+            <input id="newAccountCurrency" placeholder="幣別，例如 TWD / USD" value="TWD">
+            <input id="newAccountBalance" type="number" step="1" placeholder="起始餘額">
+            <button class="btn small green" type="submit">新增帳戶</button>
+          </form>
+          <div id="accountList" class="account-list"></div>
         </div>
-        <div class="cards" id="summaryCards"></div>
-        <div class="chart-grid">
-          <article class="chart-card">
-            <h3>支出分類排行</h3>
-            <div id="categoryBars" class="bar-list"></div>
-          </article>
-          <article class="chart-card">
-            <h3>付款方式占比</h3>
-            <div id="methodBars" class="bar-list"></div>
-          </article>
+      </article>
+    </section>
+
+    <section class="view" id="creditView">
+      <article class="panel">
+        <div class="panel-pad">
+          <h2>信用卡設定</h2>
+          <p class="hint">可建立多張信用卡；信用卡消費會歸到指定卡片，方便看待繳金額。</p>
+          <form id="creditForm" class="manager-form account-form">
+            <input id="newCreditName" placeholder="信用卡名稱，例如：國泰 CUBE">
+            <input id="newCreditCurrency" placeholder="幣別，例如 TWD / USD" value="TWD">
+            <input id="newCreditBalance" type="number" step="1" placeholder="目前已刷金額，可留空">
+            <button class="btn small green" type="submit">新增信用卡</button>
+          </form>
+          <div id="creditList" class="account-list"></div>
         </div>
+      </article>
+    </section>
+
+    <section class="view" id="categoryView">
+      <div class="view-grid">
         <article class="panel">
           <div class="panel-pad">
-            <h3>記帳明細</h3>
-            <p class="hint">最新資料排在最上方，可直接刪除錯誤紀錄。</p>
+            <h2>分類設定</h2>
+            <p class="hint">分類會依收入 / 支出分開管理。</p>
+            <div class="segmented" aria-label="分類類型">
+              <button type="button" class="active" data-type="expense">支出分類</button>
+              <button type="button" data-type="income">收入分類</button>
+            </div>
+            <form id="categoryForm" class="manager-form">
+              <input id="newCategory" placeholder="新增分類，例如：咖啡、學費、薪資">
+              <button class="btn small blue" type="submit">新增</button>
+            </form>
+            <div id="categoryPills" class="pill-list"></div>
           </div>
-          <div id="entryTable"></div>
         </article>
-      </section>
+        <article class="panel">
+          <div class="panel-pad">
+            <h2>付款方式</h2>
+            <p class="hint">可新增 Apple Pay、悠遊付、街口、轉帳等常用方式。</p>
+            <form id="methodForm" class="manager-form">
+              <input id="newMethod" placeholder="新增方式，例如：悠遊付、街口、Apple Pay">
+              <button class="btn small purple" type="submit">新增</button>
+            </form>
+            <div id="methodPills" class="pill-list"></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" id="analyticsView">
+      <div class="toolbar">
+        <div>
+          <h2>統計分析</h2>
+          <p class="hint">預設顯示本月，可依月份、類型或關鍵字篩選。</p>
+        </div>
+        <div class="filters">
+          <input id="monthFilter" type="month">
+          <select id="typeFilter">
+            <option value="all">全部</option>
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+          <input id="searchInput" type="search" placeholder="搜尋分類、商家、備註">
+        </div>
+      </div>
+      <div class="cards" id="summaryCards"></div>
+      <div class="chart-grid">
+        <article class="chart-card">
+          <h3>支出分類排行</h3>
+          <div id="categoryBars" class="bar-list"></div>
+        </article>
+        <article class="chart-card">
+          <h3>付款方式占比</h3>
+          <div id="methodBars" class="bar-list"></div>
+        </article>
+      </div>
+      <article class="panel">
+        <div class="panel-pad">
+          <h3>分析明細</h3>
+          <p class="hint">會依上方篩選條件顯示。</p>
+        </div>
+        <div id="analysisTable"></div>
+      </article>
     </section>
   </main>
   <nav class="mobile-actions" aria-label="手機快速操作">
-    <button class="btn green" type="button" data-scroll="entryForm">新增</button>
-    <button class="btn blue" type="button" data-scroll="summaryCards">總覽</button>
+    <button class="btn green" type="button" data-view="entryView">新增</button>
+    <button class="btn blue" type="button" data-view="analyticsView">統計</button>
     <a class="btn dark" href="personal-assets-dashboard.html">儀表板</a>
   </nav>
   <div class="toast" id="toast"></div>
 
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
+    const accountingTabs = [
+      ["entryView", "收入支出"],
+      ["accountView", "帳戶設定"],
+      ["creditView", "信用卡設定"],
+      ["categoryView", "分類設定"],
+      ["analyticsView", "統計分析"]
+    ];
     const entryTypeButtons = [...document.querySelectorAll("[data-type]")];
     const form = document.getElementById("entryForm");
     const categorySelect = document.getElementById("category");
@@ -541,6 +675,9 @@
     const typeFilter = document.getElementById("typeFilter");
     const searchInput = document.getElementById("searchInput");
     const toastEl = document.getElementById("toast");
+    const invoicePhoto = document.getElementById("invoicePhoto");
+    const invoicePreview = document.getElementById("invoicePreview");
+    const invoiceStatus = document.getElementById("invoiceStatus");
     const defaultCategories = {
       income: ["薪資", "股息", "利息", "獎金", "退款", "其他收入"],
       expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "其他支出"]
@@ -552,6 +689,7 @@
       { id: "credit-card", name: "信用卡", type: "信用卡", currency: "TWD", openingBalance: 0 }
     ];
     let currentType = "expense";
+    let currentView = "entryView";
     let ledger = loadLedger();
 
     function today() {
@@ -613,6 +751,17 @@
       clearTimeout(toastEl._timer);
       toastEl._timer = setTimeout(() => toastEl.classList.remove("show"), 1700);
     }
+    function renderTabs() {
+      document.getElementById("accountingTabs").innerHTML = accountingTabs
+        .map(([id, label]) => `<button type="button" class="tab ${id === currentView ? "active" : ""}" data-view="${id}">${label}</button>`)
+        .join("");
+      document.querySelectorAll(".view").forEach(view => view.classList.toggle("active", view.id === currentView));
+    }
+    function switchView(id) {
+      currentView = id;
+      renderTabs();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     function setType(type) {
       currentType = type;
       entryTypeButtons.forEach(button => button.classList.toggle("active", button.dataset.type === type));
@@ -667,13 +816,25 @@
       }, Number(account.openingBalance) || 0);
     }
     function renderAccounts() {
-      document.getElementById("accountList").innerHTML = ledger.accounts.map(account => {
+      const regularAccounts = ledger.accounts.filter(account => account.type !== "信用卡");
+      document.getElementById("accountList").innerHTML = regularAccounts.map(account => {
         const balance = accountBalance(account);
         return `<div class="account-tile">
           <div><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
           <div><span class="account-balance">${money(balance)} ${escapeHtml(account.currency)}</span><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
         </div>`;
-      }).join("");
+      }).join("") || `<div class="empty">尚未建立一般帳戶</div>`;
+      renderCreditCards();
+    }
+    function renderCreditCards() {
+      const creditCards = ledger.accounts.filter(account => account.type === "信用卡");
+      document.getElementById("creditList").innerHTML = creditCards.map(account => {
+        const balance = accountBalance(account);
+        return `<div class="account-tile">
+          <div><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)}｜目前已刷 / 起始 ${money(account.openingBalance)}</small></div>
+          <div><span class="account-balance">${money(Math.abs(balance))} ${escapeHtml(account.currency)}</span><button type="button" data-remove-account="${escapeHtml(account.name)}">刪除</button></div>
+        </div>`;
+      }).join("") || `<div class="empty">尚未建立信用卡</div>`;
     }
     function renderCards(rows) {
       const income = sum(rows.filter(row => row.type === "income"), row => row.amount);
@@ -695,12 +856,12 @@
         ? rows.slice(0, 8).map(row => `<div class="bar-row"><strong>${escapeHtml(row.label)}</strong><span class="bar-track"><i class="bar-fill" style="--w:${Math.max(4, row.value / max * 100).toFixed(1)}%;--c:${color}"></i></span><span>${money(row.value)}</span></div>`).join("")
         : `<div class="empty">目前沒有可呈現資料</div>`;
     }
-    function renderTable(rows) {
+    function renderTable(target, rows) {
       if (!rows.length) {
-        document.getElementById("entryTable").innerHTML = `<div class="empty">目前沒有符合條件的記帳資料</div>`;
+        document.getElementById(target).innerHTML = `<div class="empty">目前沒有符合條件的記帳資料</div>`;
         return;
       }
-      document.getElementById("entryTable").innerHTML = `<div class="table-wrap"><table>
+      document.getElementById(target).innerHTML = `<div class="table-wrap"><table>
         <thead><tr><th>日期</th><th>類型</th><th>分類</th><th>金額</th><th>付款帳戶</th><th>方式</th><th>商家 / 對象</th><th>備註</th><th>操作</th></tr></thead>
         <tbody>${rows.map(row => {
           const account = ledger.accounts.find(item => item.name === row.account);
@@ -719,12 +880,17 @@
       </table></div>`;
     }
     function render() {
+      renderTabs();
       refreshLists();
       const rows = filteredEntries();
+      const recentRows = [...ledger.entries]
+        .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")))
+        .slice(0, 12);
       renderCards(rows);
       renderBars("categoryBars", groupRows(rows.filter(row => row.type === "expense"), "category"), "var(--blue)");
       renderBars("methodBars", groupRows(rows, "method"), "var(--green)");
-      renderTable(rows);
+      renderTable("entryTable", recentRows);
+      renderTable("analysisTable", rows);
     }
     function download(filename, content, type) {
       const blob = new Blob([content], { type });
@@ -735,6 +901,49 @@
     }
     function csvEscape(value) {
       return `"${String(value ?? "").replace(/"/g, '""')}"`;
+    }
+    function setInvoiceStatus(message) {
+      invoiceStatus.textContent = message;
+    }
+    function parseInvoiceText(text) {
+      const compact = String(text || "").replace(/\s+/g, " ");
+      const amountMatches = [...compact.matchAll(/(?:總計|合計|總額|金額|Total|TOTAL)[^\d]{0,8}([\d,]+)/g)];
+      const looseAmounts = [...compact.matchAll(/\b([\d,]{2,7})\b/g)].map(match => Number(match[1].replace(/,/g, ""))).filter(value => value > 0 && value < 1000000);
+      const amount = amountMatches.length
+        ? Number(amountMatches.at(-1)[1].replace(/,/g, ""))
+        : Math.max(0, ...looseAmounts);
+      const dateMatch = compact.match(/(20\d{2})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/) || compact.match(/(\d{3})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+      let parsedDate = "";
+      if (dateMatch) {
+        const year = Number(dateMatch[1]) < 1000 ? Number(dateMatch[1]) + 1911 : Number(dateMatch[1]);
+        parsedDate = `${year}-${String(dateMatch[2]).padStart(2, "0")}-${String(dateMatch[3]).padStart(2, "0")}`;
+      }
+      return { amount, date: parsedDate };
+    }
+    async function recognizeInvoice() {
+      const file = invoicePhoto.files?.[0];
+      if (!file) {
+        setInvoiceStatus("請先拍照或選擇發票照片");
+        return;
+      }
+      if (!("TextDetector" in window)) {
+        setInvoiceStatus("這個瀏覽器尚未支援內建文字辨識；已保留照片預覽，請手動輸入金額與日期。");
+        return;
+      }
+      try {
+        setInvoiceStatus("辨識中...");
+        const detector = new TextDetector();
+        const bitmap = await createImageBitmap(file);
+        const result = await detector.detect(bitmap);
+        const text = result.map(item => item.rawValue || "").join(" ");
+        const parsed = parseInvoiceText(text);
+        if (parsed.date) document.getElementById("date").value = parsed.date;
+        if (parsed.amount) document.getElementById("amount").value = parsed.amount;
+        if (!document.getElementById("merchant").value && result[0]?.rawValue) document.getElementById("merchant").value = result[0].rawValue.slice(0, 24);
+        setInvoiceStatus(parsed.amount || parsed.date ? "已嘗試帶入發票日期與金額，請再確認一次。" : "有辨識到文字，但未抓到明確金額；請手動輸入。");
+      } catch {
+        setInvoiceStatus("辨識失敗，請改用手動輸入。");
+      }
     }
     entryTypeButtons.forEach(button => button.addEventListener("click", () => setType(button.dataset.type)));
     form.addEventListener("submit", event => {
@@ -764,6 +973,11 @@
       toast("已新增記帳");
     });
     document.addEventListener("click", event => {
+      const viewButton = event.target.closest("[data-view]");
+      if (viewButton) {
+        switchView(viewButton.dataset.view);
+        return;
+      }
       const del = event.target.closest("[data-delete]");
       if (del && confirm("確定刪除此筆記帳？")) {
         ledger.entries = ledger.entries.filter(row => row.id !== del.dataset.delete);
@@ -833,6 +1047,28 @@
       accountSelect.value = name;
       toast("已新增付款帳戶");
     });
+    document.getElementById("creditForm").addEventListener("submit", event => {
+      event.preventDefault();
+      const name = document.getElementById("newCreditName").value.trim();
+      if (!name) return;
+      if (ledger.accounts.some(account => account.name === name)) {
+        toast("信用卡名稱已存在");
+        return;
+      }
+      ledger.accounts.push({
+        id: uid(),
+        name,
+        type: "信用卡",
+        currency: document.getElementById("newCreditCurrency").value.trim().toUpperCase() || "TWD",
+        openingBalance: -(Number(document.getElementById("newCreditBalance").value) || 0)
+      });
+      document.getElementById("creditForm").reset();
+      document.getElementById("newCreditCurrency").value = "TWD";
+      saveLedger();
+      render();
+      accountSelect.value = name;
+      toast("已新增信用卡");
+    });
     document.getElementById("methodForm").addEventListener("submit", event => {
       event.preventDefault();
       const input = document.getElementById("newMethod");
@@ -845,6 +1081,18 @@
       methodSelect.value = value;
       toast("已新增付款方式");
     });
+    invoicePhoto.addEventListener("change", () => {
+      const file = invoicePhoto.files?.[0];
+      if (!file) {
+        invoicePreview.style.display = "none";
+        setInvoiceStatus("尚未選擇發票照片");
+        return;
+      }
+      invoicePreview.src = URL.createObjectURL(file);
+      invoicePreview.style.display = "block";
+      setInvoiceStatus("已選擇發票照片，可按「辨識發票」嘗試自動帶入。");
+    });
+    document.getElementById("scanInvoice").addEventListener("click", recognizeInvoice);
     [monthFilter, typeFilter, searchInput].forEach(el => el.addEventListener("input", render));
     document.getElementById("exportJson").addEventListener("click", () => download("tsubin-accounting-data.json", JSON.stringify(ledger, null, 2), "application/json"));
     document.getElementById("exportCsv").addEventListener("click", () => {
@@ -891,6 +1139,11 @@
     monthFilter.value = monthOf();
     setType("expense");
     render();
+    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("service-worker.js").catch(() => {});
+      });
+    }
   </script>
 </body>
 </html>
