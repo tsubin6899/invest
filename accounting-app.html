@@ -928,6 +928,20 @@
     @media (max-width: 860px) {
       #accountList .account-balance, #creditList .account-balance { font-size: 15px; }
     }
+    body.privacy-mode .number,
+    body.privacy-mode .account-balance,
+    body.privacy-mode .amount-income,
+    body.privacy-mode .amount-expense,
+    body.privacy-mode .day-stat span:last-child,
+    body.privacy-mode .bar-row > span:last-child,
+    body.privacy-mode .selected-day-head .hint,
+    body.privacy-mode .account-meta small,
+    body.privacy-mode .notice-item small,
+    body.privacy-mode td,
+    body.privacy-mode input[type="number"] {
+      color: transparent !important;
+      text-shadow: 0 0 9px rgba(32,36,44,.5);
+    }
   </style>
 </head>
 <body>
@@ -952,6 +966,7 @@
             <a class="btn light" href="personal-assets-dashboard.html">資產儀表板</a>
             <button class="btn purple" id="exportJson" type="button">匯出 JSON</button>
             <button class="btn blue" id="exportCsv" type="button">匯出 CSV</button>
+            <button class="btn blue" id="privacyToggle" type="button">隱私模式</button>
             <button class="btn green" id="importButton" type="button">匯入資料</button>
             <button class="btn danger" id="clearData" type="button">清空資料</button>
           </div>
@@ -1295,6 +1310,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const accountingKey = "personal-accounting-tsubin-v1";
+    const accountingUiKey = "personal-accounting-ui-tsubin-v1";
     const dashboardStorageKey = "personal-assets-dashboard-tsubin-v2";
     const trustedDeviceKey = "tsubin-accounting-trusted-device-v1";
     let sharedFxRates = { TWD: 1 };
@@ -1387,6 +1403,7 @@
     let receiptDataUrl = "";
     let monthlyBackups = [];
     let autoCloudSaveTimer = 0;
+    let privacyMode = false;
     const defaultCategories = {
       income: ["薪資", "股息", "利息", "獎金", "退款", "現金盤點調整", "其他收入"],
       expense: ["餐飲", "交通", "生活用品", "房租房貸", "水電瓦斯", "保險", "醫療", "娛樂", "教育", "投資費用", "現金盤點調整", "其他支出"]
@@ -1704,6 +1721,24 @@
     function saveLedger() {
       localStorage.setItem(accountingKey, JSON.stringify(ledger));
       scheduleCloudBackup();
+    }
+    function loadUiPreferences() {
+      try {
+        return { privacyMode: false, ...JSON.parse(localStorage.getItem(accountingUiKey) || "{}") };
+      } catch {
+        return { privacyMode: false };
+      }
+    }
+    function saveUiPreferences() {
+      localStorage.setItem(accountingUiKey, JSON.stringify({ privacyMode }));
+    }
+    function applyPrivacyMode() {
+      document.body.classList.toggle("privacy-mode", privacyMode);
+      const button = document.getElementById("privacyToggle");
+      if (!button) return;
+      button.textContent = privacyMode ? "顯示金額" : "隱私模式";
+      button.classList.toggle("purple", privacyMode);
+      button.classList.toggle("blue", !privacyMode);
     }
     function setCloudStatus(text) {
       const el = document.getElementById("cloudStatus");
@@ -3260,6 +3295,12 @@
     document.getElementById("cloudSave").addEventListener("click", saveCloudData);
     document.getElementById("cloudLoad").addEventListener("click", loadCloudData);
     document.getElementById("cloudLogout").addEventListener("click", logoutCloudSync);
+    document.getElementById("privacyToggle").addEventListener("click", () => {
+      privacyMode = !privacyMode;
+      saveUiPreferences();
+      applyPrivacyMode();
+      toast(privacyMode ? "已開啟隱私模式" : "已關閉隱私模式");
+    });
     document.getElementById("importFile").addEventListener("change", async event => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -3319,6 +3360,8 @@
     recurringMonthSelect.value = monthOf().slice(5, 7);
     updateRecurringEndDate();
     updateRecurringScheduleFields();
+    privacyMode = Boolean(loadUiPreferences().privacyMode);
+    applyPrivacyMode();
     loadSharedFxRates();
     setType("expense");
     render();
