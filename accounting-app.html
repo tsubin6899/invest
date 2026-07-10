@@ -1112,6 +1112,7 @@
             <input id="recurringName" placeholder="名稱，例如：房租">
             <input id="recurringAmount" type="number" min="0" step="1" placeholder="金額">
             <select id="recurringCategory"></select>
+            <select id="recurringItem"></select>
             <select id="recurringAccount"></select>
             <select id="recurringCycle">
               <option value="monthly">每月</option>
@@ -1265,6 +1266,7 @@
     const cycleCardSelect = document.getElementById("cycleCard");
     const recurringTypeSelect = document.getElementById("recurringType");
     const recurringCategorySelect = document.getElementById("recurringCategory");
+    const recurringItemSelect = document.getElementById("recurringItem");
     const recurringAccountSelect = document.getElementById("recurringAccount");
     const recurringEndModeSelect = document.getElementById("recurringEndMode");
     const recurringEndDateInput = document.getElementById("recurringEndDate");
@@ -1565,6 +1567,7 @@
         name: String(row.name || "").trim(),
         amount: Number(row.amount) || 0,
         category: String(row.category || "").trim(),
+        item: String(row.item || "").trim(),
         account: String(row.account || "").trim(),
         cycle: ["weekly", "monthly", "yearly"].includes(row.cycle) ? row.cycle : "monthly",
         day: Math.min(31, Math.max(1, Number(row.day) || 1)),
@@ -1897,7 +1900,14 @@
       templateAccountSelect.innerHTML = accountOptions;
       reconcileAccountSelect.innerHTML = accountOptions;
       cycleCardSelect.innerHTML = cardOptions;
-      recurringCategorySelect.innerHTML = (ledger.categories[recurringTypeSelect.value] || []).map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+      const recurringCategories = ledger.categories[recurringTypeSelect.value] || [];
+      const selectedRecurringCategory = recurringCategorySelect.value;
+      recurringCategorySelect.innerHTML = recurringCategories.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
+      if (selectedRecurringCategory && recurringCategories.includes(selectedRecurringCategory)) recurringCategorySelect.value = selectedRecurringCategory;
+      const recurringItems = ledger.items?.[recurringTypeSelect.value]?.[recurringCategorySelect.value] || [];
+      const selectedRecurringItem = recurringItemSelect.value;
+      recurringItemSelect.innerHTML = [`<option value="">未指定項目</option>`, ...recurringItems.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`)].join("");
+      if (selectedRecurringItem && recurringItems.includes(selectedRecurringItem)) recurringItemSelect.value = selectedRecurringItem;
       recurringAccountSelect.innerHTML = accountOptions;
       budgetCategorySelect.innerHTML = expenseCategories.map(item => `<option value="${escapeHtml(item)}">${escapeHtml(item)}</option>`).join("");
       updateReconcilePreview();
@@ -2250,7 +2260,7 @@
       const target = document.getElementById("recurringList");
       const cycleLabels = { weekly: "每週", monthly: "每月", yearly: "每年" };
       target.innerHTML = (ledger.recurringRules || []).length
-        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${cycleLabels[row.cycle || "monthly"] || "每月"} ${row.day} 日｜${escapeHtml(row.category)}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" data-remove-recurring="${escapeHtml(row.id)}">刪除</button></div></div>`).join("")
+        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${cycleLabels[row.cycle || "monthly"] || "每月"} ${row.day} 日｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" data-remove-recurring="${escapeHtml(row.id)}">刪除</button></div></div>`).join("")
         : `<div class="empty">尚未建立固定收支</div>`;
     }
     function renderBudgetAlerts(rows) {
@@ -2751,6 +2761,7 @@
       if (!hasEndDate) recurringEndDateInput.value = "";
     }
     recurringTypeSelect.addEventListener("change", renderUtilityOptions);
+    recurringCategorySelect.addEventListener("change", renderUtilityOptions);
     recurringEndModeSelect.addEventListener("change", updateRecurringEndDate);
     document.getElementById("recurringForm").addEventListener("submit", event => {
       event.preventDefault();
@@ -2767,6 +2778,7 @@
         name,
         amount,
         category: recurringCategorySelect.value,
+        item: recurringItemSelect.value || "",
         account: recurringAccountSelect.value,
         cycle: document.getElementById("recurringCycle").value || "monthly",
         day: Math.min(31, Math.max(1, Number(document.getElementById("recurringDay").value) || 1)),
@@ -2793,7 +2805,7 @@
             date,
             amount: rule.amount,
             category: rule.category,
-            item: "",
+            item: rule.item || "",
             account: rule.account,
             merchant: rule.name,
             note: "固定收支自動產生",
