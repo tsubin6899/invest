@@ -388,6 +388,22 @@
       align-self: end;
       justify-content: flex-end;
     }
+    #accountList .account-type-cash {
+      border-left: 4px solid var(--amber);
+      background: #fff8e9;
+    }
+    #accountList .account-type-foreign-cash {
+      border-left: 4px solid var(--purple);
+      background: #f8f0fa;
+    }
+    #accountList .account-type-bank {
+      border-left: 4px solid var(--blue);
+      background: #eef7fa;
+    }
+    #accountList .account-type-mobile {
+      border-left: 4px solid var(--green);
+      background: #edf8f2;
+    }
     #creditCycleSummary .account-tile, #creditBillList .account-tile {
       grid-template-columns: minmax(0, 1fr) auto;
       align-content: space-between;
@@ -2274,7 +2290,14 @@
         const balance = accountBalance(account);
         const currency = normalizeCurrency(account.currency);
         const twdText = currency === "TWD" ? "" : `<small>約 ${money(twdEquivalent(balance, currency))} TWD</small>`;
-        return `<div class="account-tile">
+        const typeClass = ({
+          "現金": "account-type-cash",
+          "外幣現金": "account-type-foreign-cash",
+          "銀行帳戶": "account-type-bank",
+          "外幣銀行帳戶": "account-type-bank",
+          "行動支付": "account-type-mobile"
+        })[account.type] || "";
+        return `<div class="account-tile ${typeClass}">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
           <span class="account-balance">${money(balance)} ${escapeHtml(currency)}${twdText}</span>
           <div class="account-actions"><button type="button" title="刪除帳戶" aria-label="刪除帳戶" data-remove-account="${escapeHtml(account.name)}">刪</button></div>
