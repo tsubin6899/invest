@@ -280,6 +280,25 @@
       display: grid;
       gap: 10px;
     }
+    .entry-optional {
+      margin: 0;
+      border-top: 1px solid var(--line);
+      padding-top: 8px;
+    }
+    .entry-optional summary {
+      min-height: 30px;
+      display: flex;
+      align-items: center;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .entry-optional-fields {
+      display: grid;
+      gap: 10px;
+      padding-top: 8px;
+    }
     .invoice-preview, .receipt-preview {
       width: 100%;
       max-height: 220px;
@@ -856,6 +875,10 @@
       #entryForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       #templateForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       #transferForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #entryView .panel-pad { padding: 14px; }
+      #entryView .panel-pad > .hint { margin-top: 4px; font-size: 12px; line-height: 1.35; }
+      #entryView .segmented, #entryForm { margin-top: 10px; }
+      #entryOptional { padding-top: 6px; }
       #accountList, #creditList, #recurringList { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       #accountList .account-tile, #creditList .account-tile, #recurringList .account-tile { min-height: 126px; gap: 7px; padding: 9px; }
       #accountList .account-meta strong, #creditList .account-meta strong, #recurringList .account-meta strong { overflow-wrap: anywhere; }
@@ -1022,10 +1045,15 @@
               <label>分類<select id="category" required></select></label>
               <label>項目<select id="item"></select></label>
               <label>帳戶<select id="account" required></select></label>
-              <label class="full">商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
-              <label class="full">備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
-              <label class="full">收據附件<input id="receiptImage" type="file" accept="image/*" capture="environment"></label>
-              <img id="receiptPreview" class="receipt-preview" alt="收據預覽">
+              <details id="entryOptional" class="entry-optional full" open>
+                <summary>更多選填資訊</summary>
+                <div class="entry-optional-fields">
+                  <label>商家 / 對象<input id="merchant" placeholder="超商、餐廳、薪資等"></label>
+                  <label>備註<textarea id="note" placeholder="可填發票、用途或提醒"></textarea></label>
+                  <label>收據附件<input id="receiptImage" type="file" accept="image/*" capture="environment"></label>
+                  <img id="receiptPreview" class="receipt-preview" alt="收據預覽">
+                </div>
+              </details>
               <button class="btn green full" type="submit">新增記帳</button>
             </form>
             <section class="invoice-box">
@@ -1374,6 +1402,7 @@
     };
     const entryTypeButtons = [...document.querySelectorAll("[data-type]")];
     const form = document.getElementById("entryForm");
+    const entryOptional = document.getElementById("entryOptional");
     const categorySelect = document.getElementById("category");
     const itemSelect = document.getElementById("item");
     const itemCategorySelect = document.getElementById("itemCategory");
@@ -3389,6 +3418,7 @@
     recurringMonthSelect.value = monthOf().slice(5, 7);
     updateRecurringEndDate();
     updateRecurringScheduleFields();
+    if (window.matchMedia("(max-width: 860px)").matches && entryOptional) entryOptional.open = false;
     privacyMode = Boolean(loadUiPreferences().privacyMode);
     applyPrivacyMode();
     loadSharedFxRates();
