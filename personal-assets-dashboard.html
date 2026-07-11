@@ -99,6 +99,15 @@
       background: #fff;
       color: var(--muted);
     }
+    .icon-btn.delete-icon {
+      display: inline-grid;
+      place-items: center;
+      border-color: #dfb6ae;
+      border-radius: 7px;
+      color: var(--red);
+      background: #fff7f5;
+    }
+    .icon-btn.delete-icon svg { width: 15px; height: 15px; }
     .tabs {
       margin-bottom: 46px;
       padding: 10px 14px;
@@ -3109,6 +3118,13 @@
       document.getElementById("chart").innerHTML = renderInfoCharts();
       wireInputs();
       applyUiState();
+      document.querySelectorAll("button[data-del]").forEach(button => {
+        button.classList.add("delete-icon");
+        button.title = "刪除";
+        button.setAttribute("aria-label", "刪除");
+        button.innerHTML = '<i data-lucide="trash-2" aria-hidden="true"></i>';
+      });
+      if (window.lucide) window.lucide.createIcons();
       requestAnimationFrame(updateHeaderOffset);
     }
     function setPath(path, value) {

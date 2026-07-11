@@ -1028,6 +1028,36 @@
       font-weight: 400;
       line-height: 1;
     }
+    .icon-action {
+      display: inline-grid;
+      place-items: center;
+      width: 32px;
+      min-width: 32px;
+      height: 32px;
+      padding: 0;
+      border-radius: 7px;
+    }
+    .icon-action svg { width: 15px; height: 15px; }
+    .icon-action.edit { border: 1px solid #aac8c4; color: #247f7a; background: #edf8f6; }
+    .icon-action.delete { border: 1px solid #dfb6ae; color: var(--red); background: #fff7f5; }
+    .account-actions .icon-action.delete, .account-actions .bill-delete-button.icon-action {
+      border: 1px solid #dfb6ae;
+      color: var(--red);
+      background: #fff7f5;
+    }
+    .edit-dialog {
+      width: min(560px, calc(100vw - 28px));
+      padding: 0;
+      border: 1px solid #cfdcda;
+      border-radius: 8px;
+      color: var(--ink);
+      background: #fffefb;
+      box-shadow: 0 24px 56px rgba(21,32,49,.24);
+    }
+    .edit-dialog::backdrop { background: rgba(23,32,51,.42); }
+    .edit-dialog form { padding: 20px; }
+    .edit-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+    .edit-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
     @media (max-width: 860px) {
       #accountList .account-balance, #creditList .account-balance { font-size: 15px; }
     }
@@ -1413,6 +1443,13 @@
     <a class="btn dark" href="personal-assets-dashboard.html">儀表板</a>
   </nav>
   <div class="toast" id="toast"></div>
+  <dialog class="edit-dialog" id="editDialog">
+    <form id="editForm" method="dialog">
+      <div class="edit-dialog-head"><h3 id="editDialogTitle">編輯</h3><button class="icon-action delete" id="editCancel" type="button" title="關閉" aria-label="關閉">×</button></div>
+      <div class="form-grid" id="editFields"></div>
+      <div class="edit-dialog-actions"><button class="btn light" id="editCancelText" type="button">取消</button><button class="btn green" type="submit">儲存修改</button></div>
+    </form>
+  </dialog>
 
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -1452,6 +1489,10 @@
     };
     const entryTypeButtons = [...document.querySelectorAll("[data-type]")];
     const form = document.getElementById("entryForm");
+    const editDialog = document.getElementById("editDialog");
+    const editForm = document.getElementById("editForm");
+    const editFields = document.getElementById("editFields");
+    let editState = null;
     const entryOptional = document.getElementById("entryOptional");
     const categorySelect = document.getElementById("category");
     const itemSelect = document.getElementById("item");
@@ -2245,6 +2286,88 @@
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
     }
+    function editOptions(values, selected) {
+      return values.map(value => `<option value="${escapeHtml(value)}"${value === selected ? " selected" : ""}>${escapeHtml(value)}</option>`).join("");
+    }
+    function openEdit(kind, id) {
+      editState = { kind, id };
+      const title = document.getElementById("editDialogTitle");
+      if (kind === "account") {
+        const row = ledger.accounts.find(item => item.id === id);
+        if (!row) return;
+        title.textContent = row.type === "信用卡" ? "編輯信用卡" : "編輯帳戶";
+        editFields.innerHTML = `
+          <label>名稱<input name="name" value="${escapeHtml(row.name)}" required></label>
+          <label>類型<select name="type">${editOptions(getAccountTypeOptions(), row.type)}</select></label>
+          <label>幣別<input name="currency" value="${escapeHtml(row.currency)}" required></label>
+          <label>起始餘額<input name="openingBalance" type="number" step="1" value="${Number(row.openingBalance) || 0}"></label>
+          <label>結帳日<input name="statementDay" type="number" min="0" max="31" value="${Number(row.statementDay) || ""}"></label>
+          <label>繳款日<input name="paymentDay" type="number" min="0" max="31" value="${Number(row.paymentDay) || ""}"></label>`;
+      } else if (kind === "bill") {
+        const row = (ledger.creditBills || []).find(item => item.id === id);
+        if (!row) return;
+        title.textContent = "編輯信用卡帳單";
+        const cards = ledger.accounts.filter(account => account.type === "信用卡").map(account => account.name);
+        const accounts = ledger.accounts.filter(account => account.type !== "信用卡").map(account => account.name);
+        editFields.innerHTML = `
+          <label>信用卡<select name="card">${editOptions(cards, row.card)}</select></label>
+          <label>帳單月份<input name="billMonth" type="month" value="${escapeHtml(row.billMonth)}" required></label>
+          <label>應繳金額<input name="amount" type="number" min="0" step="1" value="${Number(row.amount) || 0}" required></label>
+          <label>繳款帳戶<select name="payAccount">${editOptions(accounts, row.payAccount)}</select></label>
+          <label class="full">繳款截止日<input name="dueDate" type="date" value="${escapeHtml(row.dueDate || "")}"></label>`;
+      } else if (kind === "recurring") {
+        const row = (ledger.recurringRules || []).find(item => item.id === id);
+        if (!row) return;
+        title.textContent = "編輯固定收支";
+        const categories = ledger.categories[row.type] || [];
+        editFields.innerHTML = `
+          <label>類型<select name="type"><option value="expense"${row.type === "expense" ? " selected" : ""}>支出</option><option value="income"${row.type === "income" ? " selected" : ""}>收入</option></select></label>
+          <label>名稱<input name="name" value="${escapeHtml(row.name)}" required></label>
+          <label>金額<input name="amount" type="number" min="0" step="1" value="${Number(row.amount) || 0}" required></label>
+          <label>分類<select name="category">${editOptions(categories, row.category)}</select></label>
+          <label>項目<input name="item" value="${escapeHtml(row.item || "")}"></label>
+          <label>帳戶<select name="account">${editOptions(ledger.accounts.map(account => account.name), row.account)}</select></label>
+          <label>週期<select name="cycle"><option value="monthly"${row.cycle === "monthly" ? " selected" : ""}>每月</option><option value="weekly"${row.cycle === "weekly" ? " selected" : ""}>每週</option><option value="yearly"${row.cycle === "yearly" ? " selected" : ""}>每年</option></select></label>
+          <label>日期<input name="day" type="number" min="1" max="31" value="${Number(row.day) || 1}" required></label>
+          <label>停止日期<input name="endDate" type="date" value="${escapeHtml(row.endDate || "")}"></label>`;
+      }
+      editDialog.showModal();
+      if (window.lucide) window.lucide.createIcons();
+    }
+    function replaceAccountReferences(from, to) {
+      if (!from || from === to) return;
+      ledger.entries.forEach(row => { if (row.account === from) row.account = to; });
+      ledger.transfers.forEach(row => { ["fromAccount", "toAccount", "feeAccount"].forEach(key => { if (row[key] === from) row[key] = to; }); });
+      ledger.creditBills.forEach(row => { if (row.card === from) row.card = to; if (row.payAccount === from) row.payAccount = to; });
+      ledger.creditInstallments.forEach(row => { if (row.card === from) row.card = to; });
+      ledger.templates.forEach(row => { if (row.account === from) row.account = to; });
+      ledger.recurringRules.forEach(row => { if (row.account === from) row.account = to; });
+      ledger.reconciliations.forEach(row => { if (row.account === from) row.account = to; });
+    }
+    function saveEdit(values) {
+      if (!editState) return;
+      if (editState.kind === "account") {
+        const row = ledger.accounts.find(item => item.id === editState.id);
+        const name = String(values.name || "").trim();
+        if (!row || !name) return;
+        if (name !== row.name && ledger.accounts.some(item => item.name === name)) { toast("帳戶名稱已存在"); return; }
+        const oldName = row.name;
+        Object.assign(row, { name, type: values.type || "其他", currency: normalizeCurrency(values.currency), openingBalance: Number(values.openingBalance) || 0, statementDay: Number(values.statementDay) || 0, paymentDay: Number(values.paymentDay) || 0 });
+        replaceAccountReferences(oldName, name);
+      } else if (editState.kind === "bill") {
+        const row = (ledger.creditBills || []).find(item => item.id === editState.id);
+        if (!row) return;
+        Object.assign(row, { card: values.card, billMonth: values.billMonth, amount: Number(values.amount) || 0, payAccount: values.payAccount, dueDate: values.dueDate || "" });
+      } else if (editState.kind === "recurring") {
+        const row = (ledger.recurringRules || []).find(item => item.id === editState.id);
+        if (!row) return;
+        Object.assign(row, { type: values.type === "income" ? "income" : "expense", name: String(values.name || "").trim(), amount: Number(values.amount) || 0, category: values.category || "", item: String(values.item || "").trim(), account: values.account || "", cycle: values.cycle || "monthly", day: Math.min(31, Math.max(1, Number(values.day) || 1)), endDate: values.endDate || "" });
+      }
+      saveLedger();
+      editDialog.close();
+      render();
+      toast("已儲存修改");
+    }
     function filteredEntries() {
       const month = monthFilter.value;
       const type = typeFilter.value;
@@ -2311,7 +2434,7 @@
         return `<div class="account-tile ${typeClass}">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.type)}｜${escapeHtml(account.currency)}｜起始 ${money(account.openingBalance)}</small></div>
           <span class="account-balance">${money(balance)} ${escapeHtml(currency)}${twdText}</span>
-          <div class="account-actions"><button type="button" title="刪除帳戶" aria-label="刪除帳戶" data-remove-account="${escapeHtml(account.name)}">刪</button></div>
+          <div class="account-actions"><button class="icon-action edit" type="button" title="編輯帳戶" aria-label="編輯帳戶" data-edit-account="${escapeHtml(account.id)}"><i data-lucide="pen-line"></i></button><button class="icon-action delete" type="button" title="刪除帳戶" aria-label="刪除帳戶" data-remove-account="${escapeHtml(account.name)}"><i data-lucide="trash-2"></i></button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立一般帳戶</div>`;
       renderCreditCards();
@@ -2323,7 +2446,7 @@
         return `<div class="account-tile">
           <div class="account-meta"><strong>${escapeHtml(account.name)}</strong><small>${escapeHtml(account.currency)}｜目前已刷 / 起始 ${money(account.openingBalance)}｜結帳日 ${account.statementDay || "-"}｜繳款日 ${account.paymentDay || "-"}</small></div>
           <span class="account-balance">${money(Math.abs(balance))} ${escapeHtml(account.currency)}</span>
-          <div class="account-actions"><button type="button" title="刪除信用卡" aria-label="刪除信用卡" data-remove-account="${escapeHtml(account.name)}">刪</button></div>
+          <div class="account-actions"><button class="icon-action edit" type="button" title="編輯信用卡" aria-label="編輯信用卡" data-edit-account="${escapeHtml(account.id)}"><i data-lucide="pen-line"></i></button><button class="icon-action delete" type="button" title="刪除信用卡" aria-label="刪除信用卡" data-remove-account="${escapeHtml(account.name)}"><i data-lucide="trash-2"></i></button></div>
         </div>`;
       }).join("") || `<div class="empty">尚未建立信用卡</div>`;
       renderCreditCycleSummary();
@@ -2422,7 +2545,7 @@
           <div class="account-actions">
             <span class="bill-status ${row.paid ? "paid" : ""}">${row.paid ? "已繳" : "待繳"}</span>
             ${row.paid ? "" : `<button class="bill-pay-button" type="button" data-pay-bill="${escapeHtml(row.id)}">已繳款</button>`}
-            ${row.autoInstallment ? "" : `<button class="bill-delete-button" type="button" data-remove-bill="${escapeHtml(row.id)}">刪除</button>`}
+            ${row.autoInstallment ? "" : `<button class="icon-action edit" type="button" title="編輯帳單" aria-label="編輯帳單" data-edit-bill="${escapeHtml(row.id)}"><i data-lucide="pen-line"></i></button><button class="bill-delete-button icon-action delete" type="button" title="刪除帳單" aria-label="刪除帳單" data-remove-bill="${escapeHtml(row.id)}"><i data-lucide="trash-2"></i></button>`}
           </div>
         </div>`).join("");
     }
@@ -2615,7 +2738,7 @@
     function renderRecurringRules() {
       const target = document.getElementById("recurringList");
       target.innerHTML = (ledger.recurringRules || []).length
-        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${recurringScheduleLabel(row)}｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button type="button" title="刪除固定收支" aria-label="刪除固定收支" data-remove-recurring="${escapeHtml(row.id)}">刪</button></div></div>`).join("")
+        ? ledger.recurringRules.map(row => `<div class="account-tile"><div class="account-meta"><strong>${escapeHtml(row.name)}</strong><small>${row.type === "income" ? "收入" : "支出"}｜${recurringScheduleLabel(row)}｜${escapeHtml(row.category)}${row.item ? ` / ${escapeHtml(row.item)}` : ""}｜${escapeHtml(row.account)}｜${row.endDate ? `到 ${escapeHtml(row.endDate)} 停止` : "無限制"}</small></div><span class="account-balance">${money(row.amount)}</span><div class="account-actions"><button class="icon-action edit" type="button" title="編輯固定收支" aria-label="編輯固定收支" data-edit-recurring="${escapeHtml(row.id)}"><i data-lucide="pen-line"></i></button><button class="icon-action delete" type="button" title="刪除固定收支" aria-label="刪除固定收支" data-remove-recurring="${escapeHtml(row.id)}"><i data-lucide="trash-2"></i></button></div></div>`).join("")
         : `<div class="empty">尚未建立固定收支</div>`;
     }
     function recurringScheduleLabel(rule) {
@@ -2722,6 +2845,13 @@
       renderMonthCloseout();
       renderBackupList();
       renderEnhancedReports();
+      document.querySelectorAll("button[data-delete], button[data-delete-transfer], button[data-remove-bill], button[data-remove-installment], button[data-remove-category], button[data-remove-item], button[data-remove-account], button[data-remove-reconcile], button[data-remove-recurring], button[data-remove-budget]").forEach(button => {
+        button.classList.add("icon-action", "delete");
+        button.title ||= "刪除";
+        button.setAttribute("aria-label", button.title);
+        button.innerHTML = '<i data-lucide="trash-2" aria-hidden="true"></i>';
+      });
+      if (window.lucide) window.lucide.createIcons();
     }
     function download(filename, content, type) {
       const blob = new Blob([content], { type });
@@ -2836,6 +2966,12 @@
         switchView(viewButton.dataset.view);
         return;
       }
+      const editAccount = event.target.closest("[data-edit-account]");
+      if (editAccount) { openEdit("account", editAccount.dataset.editAccount); return; }
+      const editBill = event.target.closest("[data-edit-bill]");
+      if (editBill) { openEdit("bill", editBill.dataset.editBill); return; }
+      const editRecurring = event.target.closest("[data-edit-recurring]");
+      if (editRecurring) { openEdit("recurring", editRecurring.dataset.editRecurring); return; }
       const del = event.target.closest("[data-delete]");
       if (del && confirm("確定刪除此筆記帳？")) {
         ledger.entries = ledger.entries.filter(row => row.id !== del.dataset.delete);
@@ -2991,6 +3127,12 @@
         render();
         toast("已刪除預算");
       }
+    });
+    document.getElementById("editCancel").addEventListener("click", () => editDialog.close());
+    document.getElementById("editCancelText").addEventListener("click", () => editDialog.close());
+    editForm.addEventListener("submit", event => {
+      event.preventDefault();
+      saveEdit(Object.fromEntries(new FormData(editForm)));
     });
     document.getElementById("categoryForm").addEventListener("submit", event => {
       event.preventDefault();
