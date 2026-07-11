@@ -891,6 +891,8 @@
       .weekday, .day-stat, .day-note { font-size: 11px; }
       .ledger-day strong { font-size: 13px; }
       .filters input, .filters select { width: 100%; min-width: 0; }
+      #analyticsView .filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #analyticsView .filters #searchInput { grid-column: 1 / -1; }
       .toolbar { align-items: stretch; }
       .filters { width: 100%; }
       .mobile-actions {
