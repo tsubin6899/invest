@@ -935,6 +935,23 @@
       #creditCycleSummary .account-balance, #creditBillList .account-balance { font-size: 13px; }
       #accountList .account-actions, #creditList .account-actions, #recurringList .account-actions { width: auto; }
       #creditCycleSummary .account-actions, #creditBillList .account-actions { width: auto; }
+      #accountList .account-tile, #creditList .account-tile, #recurringList .account-tile,
+      #creditBillList .account-tile {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: "meta" "balance" "actions";
+      }
+      #accountList .account-meta, #creditList .account-meta, #recurringList .account-meta,
+      #creditBillList .account-meta { grid-area: meta; }
+      #accountList .account-balance, #creditList .account-balance, #recurringList .account-balance,
+      #creditBillList .account-balance {
+        grid-area: balance;
+        white-space: normal;
+      }
+      #accountList .account-actions, #creditList .account-actions, #recurringList .account-actions,
+      #creditBillList .account-actions {
+        grid-area: actions;
+        justify-content: flex-end;
+      }
       .transfer-summary { grid-template-columns: 1fr; }
       .account-tile {
         grid-template-columns: minmax(0, 1fr);
@@ -2863,7 +2880,7 @@
       renderMonthCloseout();
       renderBackupList();
       renderEnhancedReports();
-      document.querySelectorAll("button[data-delete], button[data-delete-transfer], button[data-remove-bill], button[data-remove-installment], button[data-remove-category], button[data-remove-item], button[data-remove-account], button[data-remove-reconcile], button[data-remove-recurring], button[data-remove-budget]").forEach(button => {
+      document.querySelectorAll("button[data-delete], button[data-delete-transfer], button[data-remove-bill], button[data-remove-installment], button[data-remove-account], button[data-remove-reconcile], button[data-remove-recurring], button[data-remove-budget]").forEach(button => {
         button.classList.add("icon-action", "delete");
         button.title ||= "刪除";
         button.setAttribute("aria-label", button.title);

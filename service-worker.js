@@ -1,4 +1,4 @@
-const CACHE_NAME = "tsubin-assets-dashboard-invest-v48";
+const CACHE_NAME = "tsubin-assets-dashboard-invest-v49";
 const CORE_ASSETS = [
   "./",
   "./index.html",
