@@ -471,6 +471,8 @@
       color: #fffdf8;
       background: var(--navy);
     }
+    #entryView .segmented button[data-type="expense"].active { background: var(--red); }
+    #entryView .segmented button[data-type="income"].active { background: var(--green); }
     .cards {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -888,6 +890,7 @@
       .bill-grid { grid-template-columns: 1fr; }
       .installment-grid { grid-template-columns: 1fr; }
       .tool-grid { grid-template-columns: 1fr; }
+      #recurringForm { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .weekday, .day-stat, .day-note { font-size: 11px; }
       .ledger-day strong { font-size: 13px; }
       .filters input, .filters select { width: 100%; min-width: 0; }
