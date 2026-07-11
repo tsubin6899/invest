@@ -436,7 +436,11 @@
     body.privacy-mode td,
     body.privacy-mode input[type="number"] {
       color: transparent !important;
-      text-shadow: 0 0 9px rgba(32,36,44,.5);
+      -webkit-text-fill-color: transparent !important;
+      text-shadow: none !important;
+      filter: blur(12px);
+      opacity: .12;
+      user-select: none;
     }
     .mobile-quick-nav {
       display: none;

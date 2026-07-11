@@ -1088,9 +1088,14 @@
     body.privacy-mode .account-meta small,
     body.privacy-mode .notice-item small,
     body.privacy-mode td,
-    body.privacy-mode input[type="number"] {
+    body.privacy-mode input[type="number"],
+    body.privacy-mode .account-twd-equivalent {
       color: transparent !important;
-      text-shadow: 0 0 9px rgba(32,36,44,.5);
+      -webkit-text-fill-color: transparent !important;
+      text-shadow: none !important;
+      filter: blur(12px);
+      opacity: .12;
+      user-select: none;
     }
   </style>
 </head>
@@ -2478,7 +2483,7 @@
       document.getElementById("accountList").innerHTML = regularAccounts.map(account => {
         const balance = accountBalance(account);
         const currency = normalizeCurrency(account.currency);
-        const twdText = currency === "TWD" ? "" : `<small>約 ${money(twdEquivalent(balance, currency))} TWD</small>`;
+        const twdText = currency === "TWD" ? "" : `<small class="account-twd-equivalent">約 ${money(twdEquivalent(balance, currency))} TWD</small>`;
         const typeClass = ({
           "現金": "account-type-cash",
           "外幣現金": "account-type-foreign-cash",
