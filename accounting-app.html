@@ -1417,6 +1417,13 @@
         </div>
       </div>
       <div class="cards" id="summaryCards"></div>
+      <article class="panel">
+        <div class="panel-pad">
+          <h3>帳戶與信用卡總覽</h3>
+          <p class="hint">各帳戶類型與信用卡金額均依目前匯率折合為 TWD。</p>
+          <div class="cards" id="accountCreditSummary"></div>
+        </div>
+      </article>
       <article class="panel"><div class="panel-pad"><h3>月結提醒</h3><div id="monthCloseout" class="notice-list"></div></div></article>
       <article class="panel"><div class="panel-pad"><h3>財務行動中心</h3><p class="hint">集中完成月結、查看未來現金流、結轉預算與還原誤刪資料。</p><div id="financeCommandCenter" class="manager-grid"></div></div></article>
       <div class="chart-grid"><article class="chart-card"><h3>本月預算總覽</h3><div id="budgetOverview" class="bar-list"></div></article></div>
@@ -2616,6 +2623,53 @@
         .reduce((total, row) => total + (Number(row.amount) || 0), 0);
       return (Number(bill.amount) || 0) + installmentTotal;
     }
+    function creditOverviewTotals() {
+      const month = monthOf();
+      const nextMonth = shiftMonth(month, 1);
+      const cards = ledger.accounts.filter(account => account.type === "信用卡");
+      const cardFor = name => cards.find(card => card.name === name);
+      const cardAmountTwd = (amount, cardName) => twdEquivalent(amount, cardFor(cardName)?.currency || "TWD");
+      const creditRows = allEntryRows().filter(row => row.type === "expense" && cardFor(row.account));
+      const currentSpending = sum(creditRows.filter(row => String(row.date || "").startsWith(month)), row => cardAmountTwd(row.amount, row.account));
+      const nextStatementSpending = sum(creditRows.filter(row => creditStatementMonth(cardFor(row.account), row.date) === nextMonth), row => cardAmountTwd(row.amount, row.account));
+
+      const installmentByBill = installmentEntries().reduce((rows, entry) => {
+        const key = `${entry.account}__${entry.billMonth}`;
+        rows.set(key, (rows.get(key) || 0) + (Number(entry.amount) || 0));
+        return rows;
+      }, new Map());
+      const manualBillKeys = new Set();
+      let paymentDue = 0;
+      (ledger.creditBills || []).filter(row => !row.paid).forEach(row => {
+        manualBillKeys.add(`${row.card}__${row.billMonth}`);
+        paymentDue += cardAmountTwd(billTotalAmount(row), row.card);
+      });
+      installmentByBill.forEach((amount, key) => {
+        if (manualBillKeys.has(key)) return;
+        paymentDue += cardAmountTwd(amount, key.split("__")[0]);
+      });
+      return { currentSpending, paymentDue, nextStatementSpending };
+    }
+    function renderAccountCreditSummary() {
+      const target = document.getElementById("accountCreditSummary");
+      if (!target) return;
+      const accountTypes = ["現金", "銀行帳戶", "外幣現金", "外幣銀行帳戶", "行動支付"];
+      const totals = Object.fromEntries(accountTypes.map(type => [type, sum(
+        ledger.accounts.filter(account => account.type === type),
+        account => twdEquivalent(accountBalance(account), account.currency)
+      )]));
+      const credit = creditOverviewTotals();
+      target.innerHTML = [
+        card("現金總計", money(totals["現金"]), "TWD", "dark"),
+        card("銀行帳戶總計", money(totals["銀行帳戶"]), "TWD"),
+        card("外幣現金總計", money(totals["外幣現金"]), "折合 TWD"),
+        card("外幣銀行帳戶總計", money(totals["外幣銀行帳戶"]), "折合 TWD"),
+        card("行動支付總計", money(totals["行動支付"]), "TWD"),
+        card("本月信用卡刷卡", money(credit.currentSpending), "折合 TWD", "accent"),
+        card("預計繳款金額", money(credit.paymentDue), "未繳帳單｜折合 TWD", "accent"),
+        card("下月帳期預估刷卡", money(credit.nextStatementSpending), "折合 TWD")
+      ].join("");
+    }
     function renderCards(rows) {
       const income = sum(rows.filter(row => row.type === "income"), row => row.amount);
       const expense = sum(rows.filter(row => row.type === "expense"), row => row.amount);
@@ -2925,6 +2979,7 @@
       refreshLists();
       const rows = filteredEntries();
       renderCards(rows);
+      renderAccountCreditSummary();
       renderBars("categoryBars", groupRows(rows.filter(row => row.type === "expense"), "category"), "var(--blue)");
       renderBars("itemBars", groupRows(rows.filter(row => row.type === "expense"), "item"), "var(--amber)");
       renderSelectedDayDetails();
