@@ -1132,7 +1132,7 @@
       font-size: 11px;
     }
     .app-header {
-      position: fixed;
+      position: sticky;
       top: 0;
       left: 0;
       right: 0;
@@ -1148,7 +1148,7 @@
     .shell {
       width: 100%;
       margin: 0;
-      padding: calc(26px + var(--app-header-height, 150px)) 0 42px;
+      padding: 26px 0 42px;
       border: 0;
       border-radius: 0;
       background: transparent;
@@ -1399,7 +1399,7 @@
         border-radius: 0;
       }
       .shell {
-        padding-top: calc(10px + var(--app-header-height, 170px));
+        padding-top: 10px;
         padding-bottom: calc(96px + env(safe-area-inset-bottom));
       }
       .view {
@@ -2791,7 +2791,7 @@
         <div class="cards">
           ${card("總資產淨值", money(t.total), "TWD", "dark")}
           ${card("投入成本估算", money(t.cost), "TWD")}
-          ${card("未實現損益", money(t.gain), "TWD", "accent")}
+          ${card("全資產未實現損益", money(t.gain), "TWD", "accent")}
           ${card("信用卡待繳", `NT$${money(t.cards)}`, "不併入現金統計")}
         </div>
         <article class="panel"><div class="panel-pad asset-grid">
@@ -2802,7 +2802,7 @@
       `;
     }
     function renderStock(kind, title, currency) {
-      const rows = data[kind];
+      const rows = stockRows(kind);
       const fx = currency === "USD" ? data.rates.usd : 1;
       const value = stockValue(rows, fx);
       const cost = stockCost(rows, fx);
