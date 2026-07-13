@@ -2616,7 +2616,7 @@
         <div class="chart-grid">
           ${renderBarChart("年度損益與收入", annualSummaryRows(), "TWD")}
           <article class="chart-card"><h3>目前主要持股摘要</h3><div class="table-wrap"><table><thead><tr><th>市場</th><th>代碼</th><th>名稱</th><th>剩餘股數</th><th>已實現損益</th></tr></thead><tbody>${positions.map(row => `<tr><td>${row.market}</td><td>${row.code}</td><td>${row.name}</td><td>${money(row.shares, "")}</td><td class="${row.realized >= 0 ? "ok" : "gain"}">${money(row.realized, row.currency)}</td></tr>`).join("")}</tbody></table></div></article>
-          <article class="chart-card"><h3>已實現損益來源</h3>${realizedRows.length ? `<div class="bar-list">${realizedRows.map((row, i) => `<div class="legend-row"><span class="dot" style="--c:${chartColors[i % chartColors.length]}"></span><strong>${row.code || "-"}</strong><span>${money(row.realized, row.currency)}</span></div>`).join("")}</div>` : `<div class="chart-empty">今年尚無已實現損益資料</div>`}</article>
+          <article class="chart-card"><h3>已實現損益來源</h3>${realizedRows.length ? `<div class="bar-list">${realizedRows.map((row, i) => `<div class="legend-row"><span class="dot" style="--c:${chartColors[i % chartColors.length]}"></span><strong>${[row.code, row.name].filter(Boolean).join(" ") || "-"}</strong><span>${money(row.realized, row.currency)}</span></div>`).join("")}</div>` : `<div class="chart-empty">今年尚無已實現損益資料</div>`}</article>
           <article class="chart-card"><h3>備份與同步紀錄</h3>${renderBackupMeta()}</article>
         </div></div>`;
     }
@@ -2893,7 +2893,7 @@
     }
     function renderMetals(kind) {
       const isGold = kind === "gold";
-      const rows = stockRows(kind);
+      const rows = Array.isArray(data[kind]) ? data[kind] : [];
       const totalWeight = isGold ? goldGram() : silverOz();
       const cost = isGold ? goldCost() : silverCost();
       const value = isGold ? totalWeight * data.rates.goldGram : totalWeight * data.rates.silverOz;
