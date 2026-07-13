@@ -462,6 +462,18 @@
     .mobile-more-grid button, .mobile-more-grid a { min-height: 44px; display: inline-flex; align-items: center; justify-content: flex-start; gap: 8px; border: 1px solid #d8e1df; border-radius: 8px; padding: 0 11px; color: var(--ink); background: #f8fbfa; font-size: 13px; text-decoration: none; }
     .mobile-more-grid button svg, .mobile-more-grid a svg { width: 17px; height: 17px; color: var(--blue); }
     .mobile-more-grid .danger { color: #b84c40; border-color: #e6c2bc; background: #fff7f5; }
+    .app-toast {
+      position: fixed;
+      right: 24px;
+      bottom: 24px;
+      z-index: 80;
+      max-width: min(420px, calc(100vw - 32px));
+      padding: 12px 16px;
+      border-radius: 8px;
+      color: #fff;
+      background: #101c34;
+      box-shadow: 0 12px 30px rgba(0,0,0,.18);
+    }
     .setting-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -1414,6 +1426,15 @@
         display: none;
       }
       .app-header .tabs::-webkit-scrollbar { display: none; }
+      .app-toast {
+        top: calc(var(--app-header-height, 120px) + 12px);
+        right: auto;
+        bottom: auto;
+        left: 50%;
+        width: calc(100% - 32px);
+        text-align: center;
+        transform: translateX(-50%);
+      }
       #overview.active {
         display: flex;
         flex-direction: column;
@@ -3505,8 +3526,8 @@
       }
     }    function toast(msg) {
       const box = document.createElement("div");
+      box.className = "app-toast";
       box.textContent = msg;
-      box.style.cssText = "position:fixed;right:24px;bottom:24px;background:#101c34;color:#fff;padding:12px 16px;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);z-index:10";
       document.body.appendChild(box);
       setTimeout(() => box.remove(), 1800);
     }
