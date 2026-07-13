@@ -1630,6 +1630,7 @@
       usdFunds: [],
       dca: [],
       dcaTargets: [],
+      dcaSchedules: [],
       purchaseRecords: [],
       budget: [],
       pnlCalendar: [],
@@ -1641,6 +1642,7 @@
     };
     let data = load();
     let currentTab = "overview";
+    const stockSort = { tw: "value", us: "value" };
     if (["gold", "silver"].includes(currentTab)) currentTab = "metal";
     let calendarMonth = null;
     let supabaseClient = null;
@@ -2070,6 +2072,23 @@
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, "0");
       return `${year}-${month}`;
+    }
+    function syncDueDcaSchedules() {
+      if (!Array.isArray(data.dcaSchedules)) data.dcaSchedules = [];
+      const today = new Date();
+      const month = localMonthString(today);
+      let added = 0;
+      data.dcaSchedules.forEach(schedule => {
+        const day = Math.max(1, Math.min(31, Number(schedule.day) || 1));
+        const dueDay = Math.min(day, new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate());
+        if (!String(schedule.code || "").trim() || !(Number(schedule.amount) > 0) || schedule.lastProcessedMonth === month || today.getDate() < dueDay) return;
+        const currency = normalizeCurrency(schedule.currency || (schedule.market === "US" ? "USD" : "TWD"));
+        data.purchaseRecords.push({ date: `${month}-${String(dueDay).padStart(2, "0")}`, type: "buy", market: schedule.market || "TW", currency, code: schedule.code || "", name: schedule.name || "", shares: 0, price: 0, fee: 0, tax: 0, plannedAmount: Number(schedule.amount) || 0, note: `定期定額待補成交｜預定 ${money(Number(schedule.amount) || 0, currency)} ${currency}` });
+        schedule.lastProcessedMonth = month;
+        added += 1;
+      });
+      if (added) localStorage.setItem(storageKey, JSON.stringify(data));
+      return added;
     }
     function shiftMonth(month, delta) {
       const [year, monthNumber] = month.split("-").map(Number);
@@ -2804,7 +2823,15 @@
       `;
     }
     function renderStock(kind, title, currency) {
-      const rows = stockRows(kind);
+      const rows = [...stockRows(kind)].sort((a, b) => {
+        const aValue = (Number(a.shares) || 0) * (Number(a.price) || 0);
+        const bValue = (Number(b.shares) || 0) * (Number(b.price) || 0);
+        const aGain = aValue - (Number(a.shares) || 0) * (Number(a.cost) || 0);
+        const bGain = bValue - (Number(b.shares) || 0) * (Number(b.cost) || 0);
+        if (stockSort[kind] === "code") return String(a.code || "").localeCompare(String(b.code || ""));
+        if (stockSort[kind] === "gain") return bGain - aGain || String(a.code || "").localeCompare(String(b.code || ""));
+        return bValue - aValue || String(a.code || "").localeCompare(String(b.code || ""));
+      });
       const fx = currency === "USD" ? data.rates.usd : 1;
       const value = stockValue(rows, fx);
       const cost = stockCost(rows, fx);
@@ -2818,7 +2845,7 @@
         </div>
         ${renderStockCharts(rows, currency)}
         ${renderStockAnalysisCharts(kind, rows, currency)}
-        <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select id="${kind}Sort"><option value="code">依代號排序</option><option value="gain">依損益排序</option><option value="value">依市值排序</option></select></div>
+        <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select data-stock-sort="${kind}"><option value="value" ${stockSort[kind] === "value" ? "selected" : ""}>依市值排序</option><option value="gain" ${stockSort[kind] === "gain" ? "selected" : ""}>依損益排序</option><option value="code" ${stockSort[kind] === "code" ? "selected" : ""}>依代號排序</option></select></div>
         <article class="panel"><div class="table-wrap"><table>
           <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th></tr></thead>
           <tbody>${rows.map((r, i) => {
@@ -2926,6 +2953,8 @@
       return `${renderFundPage("funds", "基金", "TWD")}${renderFundPage("usdFunds", "美元基金", "USD")}`;
     }
     function renderDcaEditable() {
+      if (!Array.isArray(data.dcaSchedules)) data.dcaSchedules = [];
+      const scheduleRows = data.dcaSchedules.map((row, i) => `<tr><td>${textInput(row.day || 1, `dcaSchedules.${i}.day`, "number")}</td><td>${selectInput(row.market || "TW", `dcaSchedules.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(row.currency || (row.market === "US" ? "USD" : "TWD"), `dcaSchedules.${i}.currency`)}</td><td>${textInput(row.code || "", `dcaSchedules.${i}.code`)}</td><td>${textInput(row.name || "", `dcaSchedules.${i}.name`)}</td><td>${textInput(row.amount || 0, `dcaSchedules.${i}.amount`, "number")}</td><td>${row.lastProcessedMonth === localMonthString() ? "本月已建立" : "待到期"}</td><td><button class="icon-btn" data-del="dcaSchedules.${i}">刪</button></td></tr>`).join("");
       const targets = ensureDcaTargets();
       const codes = targets.map(dcaCode);
       const targetRows = targets.map((target, i) => {
@@ -2946,7 +2975,9 @@
           <td><button class="icon-btn" data-del="dca.${i}">刪</button></td>
         </tr>`;
       }).join("");
-      return `${section("dca", "定期定額追蹤", "", `<div class="actions" style="margin:0;padding:0;border:0;background:transparent;min-height:0"><button class="btn green small" data-add="dcaTargets">+ 新增投資標的</button><button class="btn purple small" data-add="dca">+ 新增月份紀錄</button></div>`)}
+      return `${section("dca", "定期定額設定", "設定扣款日、標的與預定金額；開啟儀表板時，已到期項目會自動建立一筆待補成交的購買股票紀錄。", `<div class="actions" style="margin:0;padding:0;border:0;background:transparent;min-height:0"><button class="btn green small" data-add="dcaSchedules">+ 新增定額排程</button></div>`)}
+        <article class="panel"><div class="panel-pad"><h3>每月扣款排程</h3><p class="section-note">扣款後請至「購買股票紀錄」補上成交價與股數；預定金額會記錄在該筆交易中。</p></div><div class="table-wrap"><table><thead><tr><th>每月幾號</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>預定金額</th><th>本月狀態</th><th>操作</th></tr></thead><tbody>${scheduleRows}</tbody></table></div></article>
+        ${section("dcaHistory", "既有月度投入紀錄", "保留過去的定期投入紀錄供查閱。")}
         <article class="panel"><div class="panel-pad"><h3>各專案預設月扣金額</h3><p class="section-note">投資標的可自行修改；變更代號時，既有月份紀錄會一起轉移到新代號。</p></div><div class="table-wrap"><table><thead><tr><th>投資標的代號</th><th>標的名稱 / 備註</th><th>預設月扣金額</th><th>操作</th></tr></thead><tbody>${targetRows}</tbody></table></div></article>
         <article class="panel"><div class="table-wrap"><table><thead><tr><th>月份</th>${codes.map(code => `<th>${code}</th>`).join("")}<th>月扣合計</th><th>操作</th></tr></thead><tbody>${monthlyRows}</tbody></table></div></article>`;
     }
@@ -3105,12 +3136,12 @@
         </div>
         ${renderPurchaseAnalysisCharts(summary)}
         <article class="panel"><div class="table-wrap"><table class="purchase-record-table">
-          <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>現金流</th><th>已實現損益</th><th>操作</th></tr></thead>
+          <thead><tr><th>交易日期</th><th>類型</th><th>市場</th><th>幣別</th><th>股票代碼</th><th>股票名稱</th><th>股數</th><th>成交價</th><th>手續費</th><th>稅費</th><th>預定金額</th><th>現金流</th><th>已實現損益</th><th>操作</th></tr></thead>
           <tbody>${sortedRecords.map(({ row: r, index: i }) => {
             const type = tradeType(r);
             const realized = summary.realizedByIndex.get(i);
             const cashFlow = type === "sell" ? purchaseCost(r) : -purchaseCost(r);
-            return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
+            return `<tr><td>${dateInput(r.date, `purchaseRecords.${i}.date`)}</td><td>${selectInput(type, `purchaseRecords.${i}.type`, [["buy", "買入"], ["sell", "賣出"]])}</td><td>${selectInput(r.market || "TW", `purchaseRecords.${i}.market`, [["TW", "台股"], ["US", "美股"]])}</td><td>${textInput(tradeCurrency(r), `purchaseRecords.${i}.currency`)}</td><td>${textInput(r.code, `purchaseRecords.${i}.code`)}</td><td>${textInput(r.name, `purchaseRecords.${i}.name`)}</td><td>${textInput(r.shares, `purchaseRecords.${i}.shares`, "number")}</td><td>${textInput(r.price, `purchaseRecords.${i}.price`, "number")}</td><td>${textInput(r.fee || 0, `purchaseRecords.${i}.fee`, "number")}</td><td>${textInput(r.tax || 0, `purchaseRecords.${i}.tax`, "number")}</td><td>${r.plannedAmount ? money(r.plannedAmount, tradeCurrency(r)) : "-"}</td><td class="${cashFlow >= 0 ? "ok" : ""}">${cashFlow >= 0 ? "+" : "-"}${money(Math.abs(cashFlow), tradeCurrency(r))}</td><td class="${realized === null ? "" : realized >= 0 ? "ok" : "gain"}">${realized === null ? "-" : money(realized, tradeCurrency(r))}</td><td><button class="icon-btn" data-del="purchaseRecords.${i}">刪</button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
         <article class="panel"><div class="panel-pad"><h3>目前持股摘要</h3></div><div class="table-wrap"><table>
@@ -3228,6 +3259,7 @@
       });
     }
     function render() {
+      syncDueDcaSchedules();
       renderTabs();
       document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === currentTab));
       document.getElementById("overview").innerHTML = renderOverview();
@@ -3290,6 +3322,7 @@
           return [code, Number(data.rates[`dca_${code}`]) || 0];
         })) },
         dcaTargets: { code: `TARGET${ensureDcaTargets().length + 1}`, name: "" },
+        dcaSchedules: { day: 1, market: "TW", currency: "TWD", code: "", name: "", amount: 0, lastProcessedMonth: "" },
         purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
         dividends: { date: localDateString(), source: "", currency: "TWD", amount: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
@@ -3375,6 +3408,10 @@
         });
       });
       document.querySelectorAll("[data-del]").forEach(el => el.addEventListener("click", () => delPath(el.dataset.del)));
+      document.querySelectorAll("[data-stock-sort]").forEach(el => el.addEventListener("change", () => {
+        stockSort[el.dataset.stockSort] = el.value;
+        render();
+      }));
       document.querySelectorAll("[data-add]").forEach(el => el.addEventListener("click", () => addRow(el.dataset.add)));
       document.querySelectorAll("[data-snapshot-pnl]").forEach(el => el.addEventListener("click", recordTodaySnapshot));
       document.querySelectorAll("[data-snapshot-all]").forEach(el => el.addEventListener("click", recordTodayFullSnapshot));
