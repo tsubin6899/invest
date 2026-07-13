@@ -537,6 +537,43 @@
       .calendar-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
       .tabs { margin-bottom: 28px; }
     }
+    @media (min-width: 721px) and (max-width: 980px) {
+      .app-header .tabs { display: none; }
+      .shell { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+      .mobile-quick-nav {
+        position: fixed;
+        left: 18px;
+        right: 18px;
+        bottom: calc(12px + env(safe-area-inset-bottom));
+        z-index: 30;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 6px;
+        padding: 7px;
+        border: 1px solid rgba(23,32,51,.12);
+        border-radius: 12px;
+        background: rgba(255,253,247,.95);
+        box-shadow: 0 18px 42px rgba(0,0,0,.22);
+        backdrop-filter: blur(12px);
+      }
+      .mobile-quick-nav button {
+        min-height: 46px;
+        border: 0;
+        border-radius: 8px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        background: transparent;
+        color: #172033;
+        font-size: 10px;
+        font-weight: 650;
+      }
+      .mobile-quick-nav button svg { width: 18px; height: 18px; }
+      .mobile-quick-nav button.active,
+      .mobile-quick-nav button.primary { background: #172033; color: #fffdf7; }
+    }
     @media (max-width: 720px) {
       body { background: #eef4f8; }
       .shell {
@@ -1532,6 +1569,7 @@
     <section class="view" id="metal"></section>
     <section class="view" id="fund"></section>
     <section class="view" id="dca"></section>
+    <section class="view" id="watchlist"></section>
     <section class="view" id="purchase"></section>
     <section class="view" id="dividend"></section>
     <section class="view" id="bookkeeping"></section>
@@ -1555,6 +1593,7 @@
       <button type="button" data-tab="metal"><i data-lucide="gem"></i>貴金屬</button>
       <button type="button" data-tab="fund"><i data-lucide="pie-chart"></i>基金</button>
       <button type="button" data-tab="dca"><i data-lucide="calendar-clock"></i>定期投入</button>
+      <button type="button" data-tab="watchlist"><i data-lucide="binoculars"></i>股票觀察名單</button>
       <button type="button" data-tab="dividend"><i data-lucide="circle-dollar-sign"></i>股息配息</button>
       <button type="button" data-tab="bookkeeping"><i data-lucide="notebook-tabs"></i>記帳總覽</button>
       <button type="button" data-tab="expense"><i data-lucide="clipboard-list"></i>支出規畫</button>
@@ -1581,7 +1620,7 @@
     const cloudTable = "asset_dashboard_profiles";
     const tabs = [
       ["overview", "總覽儀表板"], ["tw", "台股部位"], ["us", "美股部位"], ["cash", "現金帳戶"],
-      ["metal", "貴金屬"], ["fund", "基金"], ["dca", "定期投入"],
+      ["metal", "貴金屬"], ["fund", "基金"], ["dca", "定期投入"], ["watchlist", "股票觀察名單"],
       ["purchase", "購買股票紀錄"], ["dividend", "股息 / 配息紀錄"], ["bookkeeping", "記帳總覽"],
       ["expense", "支出規畫"], ["allocation", "額外資金分配"], ["annual", "年度報表"],
       ["chart", "資訊圖表庫"]
@@ -1594,6 +1633,7 @@
       metal: "gem",
       fund: "pie-chart",
       dca: "calendar-sync",
+      watchlist: "binoculars",
       purchase: "receipt-text",
       dividend: "badge-dollar-sign",
       bookkeeping: "notebook-tabs",
@@ -1610,6 +1650,7 @@
       metal: "◇",
       fund: "◔",
       dca: "↻",
+      watchlist: "◎",
       purchase: "▤",
       dividend: "$",
       bookkeeping: "帳",
@@ -1633,6 +1674,8 @@
       dca: [],
       dcaTargets: [],
       dcaSchedules: [],
+      twWatchlist: [],
+      usWatchlist: [],
       purchaseRecords: [],
       budget: [],
       pnlCalendar: [],
@@ -1936,6 +1979,29 @@
           cost: row.shares ? row.basis / row.shares : 0,
           price: quotes.get(String(row.code || "").trim().toUpperCase()) || Number(row.lastPrice) || 0
         }));
+    }
+    function valuationOf(row) {
+      const market = String(row.market || "TW").toUpperCase();
+      const code = String(row.code || "").trim().toUpperCase();
+      return data.valuationCache?.[`${market}:${code}`] || {};
+    }
+    function valuationSignal(row) {
+      const valuation = valuationOf(row);
+      const metric = String(valuation.metric || "").toLowerCase();
+      const value = Number(valuation.value);
+      if (!Number.isFinite(value)) return { metric: "待更新", action: "暫不判斷", tone: "" };
+      if (metric === "premium") {
+        const label = `${value >= 0 ? "+" : ""}${value.toFixed(2)}% 折溢價`;
+        if (value >= 2) return { metric: label, action: "減碼／勿追價", tone: "gain" };
+        if (value > 1) return { metric: label, action: "暫緩加碼", tone: "accent" };
+        if (value <= -1) return { metric: label, action: "可分批加碼", tone: "ok" };
+        return { metric: label, action: "續抱／分批", tone: "" };
+      }
+      const label = `${value.toFixed(1)} 倍本益比`;
+      if (value > 35) return { metric: label, action: "減碼／勿追價", tone: "gain" };
+      if (value > 25) return { metric: label, action: "暫緩加碼", tone: "accent" };
+      if (value <= 15) return { metric: label, action: "可分批加碼", tone: "ok" };
+      return { metric: label, action: "續抱／等回檔", tone: "" };
     }
     function goldCost() { return sum(data.gold, r => r.gold + r.labor); }
     function goldGram() { return sum(data.gold, r => r.gram); }
@@ -2839,7 +2905,7 @@
       const cost = stockCost(rows, fx);
       const gain = value - cost;
       return `
-        ${section(kind, `${title}持股總覽`, "部位、持股數與平均成本皆由「購買股票紀錄」中尚未賣出的交易自動計算；目前股價可透過匯入報價更新。")}
+        ${section(kind, `${title}持股總覽`, "部位、持股數與平均成本皆由「購買股票紀錄」中尚未賣出的交易自動計算；估值欄位以股票本益比或 ETF 折溢價率提供規則化提示，僅供研究，不構成投資建議。")}
         <div class="cards">
           ${card("總投入成本", money(cost, currency), currency)}
           ${card("當前總現值", money(value, currency), currency)}
@@ -2849,12 +2915,13 @@
         ${renderStockAnalysisCharts(kind, rows, currency)}
         <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select data-stock-sort="${kind}"><option value="value" ${stockSort[kind] === "value" ? "selected" : ""}>依市值排序</option><option value="gain" ${stockSort[kind] === "gain" ? "selected" : ""}>依損益排序</option><option value="code" ${stockSort[kind] === "code" ? "selected" : ""}>依代號排序</option></select></div>
         <article class="panel"><div class="table-wrap"><table>
-          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th></tr></thead>
+          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th><th>本益比／折溢價</th><th>估值操作提示</th></tr></thead>
           <tbody>${rows.map((r, i) => {
             const rowValue = r.shares * r.price;
             const rowCost = r.shares * r.cost;
             const rowGain = rowValue - rowCost;
-            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td></tr>`;
+            const signal = valuationSignal(r);
+            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td>${signal.metric}</td><td class="${signal.tone}">${signal.action}</td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
       `;
@@ -2983,6 +3050,16 @@
     }
     function renderDca() {
       return renderDcaEditable();
+    }
+    function renderWatchlistBlock(key, title, market, currency) {
+      const rows = data[key] || [];
+      return `<article class="panel"><div class="panel-pad"><div class="section-head"><div><h3>${title}</h3><p class="section-note">加入預計買進、但仍在觀察的標的；不計入持倉或資產總額，使用「更新股價匯率」即可同步最新股價與可用估值資料。</p></div><button class="btn green small" data-add="${key}">+ 新增${title}</button></div></div><div class="table-wrap"><table><thead><tr><th>股票代號</th><th>股票名稱</th><th>最新股價</th><th>本益比／折溢價</th><th>分析購入／賣出</th><th>觀察理由</th><th>操作</th></tr></thead><tbody>${rows.map((row, index) => {
+        const signal = valuationSignal({ ...row, market });
+        return `<tr><td>${textInput(row.code || "", `${key}.${index}.code`)}</td><td>${textInput(row.name || "", `${key}.${index}.name`)}</td><td>${moneyFixed(row.price || 0, currency, 2)}</td><td>${signal.metric}</td><td class="${signal.tone}">${signal.action}</td><td>${textInput(row.note || "", `${key}.${index}.note`)}</td><td><button class="icon-btn" data-del="${key}.${index}">刪</button></td></tr>`;
+      }).join("") || `<tr><td colspan="7" class="muted">尚未加入觀察標的</td></tr>`}</tbody></table></div></article>`;
+    }
+    function renderWatchlist() {
+      return `${section("watchlist", "股票觀察名單", "依台股與美股分開管理；估值操作提示只根據本益比或 ETF 折溢價率，不構成投資建議。")}${renderWatchlistBlock("twWatchlist", "台股觀察名單", "TW", "TWD")}${renderWatchlistBlock("usWatchlist", "美股觀察名單", "US", "USD")}`;
     }
 
 
@@ -3269,6 +3346,7 @@
       document.getElementById("metal").innerHTML = renderPreciousMetals();
       document.getElementById("fund").innerHTML = renderFund();
       document.getElementById("dca").innerHTML = renderDcaEditable();
+      document.getElementById("watchlist").innerHTML = renderWatchlist();
       document.getElementById("purchase").innerHTML = renderPurchaseRecords();
       document.getElementById("dividend").innerHTML = renderDividendPage();
       document.getElementById("bookkeeping").innerHTML = renderBookkeepingOverview();
@@ -3323,6 +3401,8 @@
         })) },
         dcaTargets: { code: `TARGET${ensureDcaTargets().length + 1}`, name: "" },
         dcaSchedules: { day: 1, market: "TW", currency: "TWD", code: "", name: "", amount: 0, lastProcessedMonth: "" },
+        twWatchlist: { code: "", name: "", price: 0, note: "" },
+        usWatchlist: { code: "", name: "", price: 0, note: "" },
         purchaseRecords: { date: localDateString(), type: "buy", market: "TW", currency: "TWD", code: "", name: "", shares: 0, price: 0, fee: 0, tax: 0, note: "" },
         dividends: { date: localDateString(), source: "", currency: "TWD", amount: 0, note: "" },
         budget: { item: "新支出", amount: 0, cycle: "每月", note: "" },
@@ -3443,8 +3523,8 @@
     function exportSymbols() {
       const payload = {
         generatedAt: new Date().toISOString(),
-        tw: stockRows("tw").map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
-        us: stockRows("us").map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
+        tw: [...stockRows("tw"), ...(data.twWatchlist || [])].map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
+        us: [...stockRows("us"), ...(data.usWatchlist || [])].map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
       };
       download("price-symbols.json", JSON.stringify(payload, null, 2), "application/json");
       toast("已匯出 price-symbols.json");
@@ -3467,6 +3547,18 @@
       };
       updateRows("tw", "TW");
       updateRows("us", "US");
+      const updateWatchlist = (key, market) => {
+        (data[key] || []).forEach(row => {
+          const code = String(row.code || "").trim().toUpperCase();
+          const quote = prices[`${market}:${code}`] || prices[code];
+          if (quote && Number.isFinite(Number(quote.price))) {
+            row.price = Number(quote.price);
+            updated += 1;
+          }
+        });
+      };
+      updateWatchlist("twWatchlist", "TW");
+      updateWatchlist("usWatchlist", "US");
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
       toast(updated ? `已更新 ${updated} 筆股價` : "沒有找到可套用的股價");
@@ -3494,19 +3586,28 @@
       toast(updated ? `已更新 ${updated} 個幣別匯率` : "沒有找到可套用的匯率");
       return updated;
     }
+    function applyLatestValuations(payload) {
+      const valuations = payload.valuations || {};
+      data.valuationCache = { ...(data.valuationCache || {}), ...valuations };
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      render();
+      return Object.keys(valuations).length;
+    }
     async function fetchMarketData() {
-      const [priceResponse, rateResponse] = await Promise.all([
+      const [priceResponse, rateResponse, valuationResponse] = await Promise.all([
         fetch(`latest-prices.json?ts=${Date.now()}`, { cache: "no-store" }),
-        fetch(`latest-rates.json?ts=${Date.now()}`, { cache: "no-store" })
+        fetch(`latest-rates.json?ts=${Date.now()}`, { cache: "no-store" }),
+        fetch(`latest-valuations.json?ts=${Date.now()}`, { cache: "no-store" })
       ]);
       if (!priceResponse.ok) throw new Error("latest-prices.json not found");
       return {
         prices: await priceResponse.json(),
-        rates: rateResponse.ok ? await rateResponse.json() : {}
+        rates: rateResponse.ok ? await rateResponse.json() : {},
+        valuations: valuationResponse.ok ? await valuationResponse.json() : {}
       };
     }
     function marketStamp(payload) {
-      return [payload?.prices?.generatedAt || "", payload?.rates?.generatedAt || ""].join("|");
+      return [payload?.prices?.generatedAt || "", payload?.rates?.generatedAt || "", payload?.valuations?.generatedAt || ""].join("|");
     }
     function cloudUpdateEndpoint() {
       return window.MARKET_DATA_UPDATE_ENDPOINT
@@ -3516,9 +3617,11 @@
     async function applyMarketData(payload) {
       const hasPrices = payload.prices?.prices && Object.keys(payload.prices.prices).length;
       const hasRates = payload.rates?.rates && Object.keys(payload.rates.rates).length;
+      const hasValuations = payload.valuations?.valuations && Object.keys(payload.valuations.valuations).length;
       if (hasPrices) applyLatestPrices(payload.prices);
       if (hasRates) applyLatestRates(payload.rates);
-      return hasPrices || hasRates;
+      if (hasValuations) applyLatestValuations(payload.valuations);
+      return hasPrices || hasRates || hasValuations;
     }
     async function waitForFreshMarketData(previousStamp) {
       const deadline = Date.now() + 120000;
