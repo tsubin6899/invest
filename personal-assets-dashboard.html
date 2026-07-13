@@ -1414,6 +1414,16 @@
         display: none;
       }
       .app-header .tabs::-webkit-scrollbar { display: none; }
+      #overview.active {
+        display: flex;
+        flex-direction: column;
+      }
+      #overview.active > :not(.dashboard-alerts) { order: 1; }
+      #overview.active > .dashboard-alerts {
+        order: 2;
+        margin-top: 14px;
+        margin-bottom: 0;
+      }
       .stock-analysis .chart-card,
       .stock-overview-charts .chart-card { font-size: 11px; }
       .stock-analysis .chart-card h3,
@@ -1528,6 +1538,7 @@
       <button type="button" data-tab="chart"><i data-lucide="chart-no-axes-combined"></i>資訊圖表</button>
       <a href="accounting-app.html"><i data-lucide="receipt-text"></i>日常記帳 App</a>
       <button type="button" data-mobile-trigger="importPrices"><i data-lucide="refresh-cw"></i>更新股價匯率</button>
+      <button type="button" data-mobile-trigger="cloudLoad"><i data-lucide="cloud-download"></i>載入雲端</button>
       <button type="button" data-mobile-trigger="privacyToggle"><i data-lucide="eye-off"></i>隱私模式</button>
       <button type="button" data-mobile-trigger="exportJson"><i data-lucide="file-down"></i>匯出存檔</button>
       <button type="button" data-mobile-trigger="saveData"><i data-lucide="file-up"></i>匯入存檔</button>
