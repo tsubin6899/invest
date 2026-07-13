@@ -1917,13 +1917,27 @@
     function twdCash(row) { return (Number(row.amount) || 0) * fxRate(row.currency); }
     function stockValue(rows, fx = 1) { return sum(rows, r => r.shares * r.price * fx); }
     function stockCost(rows, fx = 1) { return sum(rows, r => r.shares * r.cost * fx); }
+    // 股票部位以交易紀錄為準；舊持股資料只作為報價快取，不再影響持股數或成本。
+    function stockRows(kind) {
+      const market = kind === "us" ? "US" : "TW";
+      const quotes = new Map((data[kind] || []).map(row => [String(row.code || "").trim().toUpperCase(), Number(row.price) || 0]));
+      return buildTradeSummary().positions
+        .filter(row => String(row.market || "TW").toUpperCase() === market && Number(row.shares) > 0)
+        .map(row => ({
+          ...row,
+          code: String(row.code || "").trim(),
+          shares: Number(row.shares) || 0,
+          cost: row.shares ? row.basis / row.shares : 0,
+          price: quotes.get(String(row.code || "").trim().toUpperCase()) || Number(row.lastPrice) || 0
+        }));
+    }
     function goldCost() { return sum(data.gold, r => r.gold + r.labor); }
     function goldGram() { return sum(data.gold, r => r.gram); }
     function silverCost() { return sum(data.silver, r => r.cost); }
     function silverOz() { return sum(data.silver, r => r.qty * r.oz); }
     function allTotals() {
-      const tw = stockValue(data.tw);
-      const us = stockValue(data.us, data.rates.usd);
+      const tw = stockValue(stockRows("tw"));
+      const us = stockValue(stockRows("us"), data.rates.usd);
       const cash = sum(cashRows(), twdCash) + (Number(data.rates.reserve) || 0);
       const cards = accountingCreditLiability();
       const gold = goldGram() * data.rates.goldGram;
@@ -1933,7 +1947,7 @@
       const fund = fundTwd + usdFund;
       const total = tw + us + cash + gold + silver + fund - cards;
       const fundCost = sum(data.funds, r => r.cost) + sum(data.usdFunds || [], r => r.cost) * data.rates.usd;
-      const cost = stockCost(data.tw) + stockCost(data.us, data.rates.usd) + goldCost() + silverCost() + fundCost;
+      const cost = stockCost(stockRows("tw")) + stockCost(stockRows("us"), data.rates.usd) + goldCost() + silverCost() + fundCost;
       const gain = (tw + us + gold + silver + fund) - cost;
       return { tw, us, cash, cards, gold, silver, fund, fundTwd, usdFund, total, cost, gain };
     }
@@ -2302,12 +2316,12 @@
       </svg></div><div class="legend"><div class="legend-row"><span class="dot" style="--c:var(--blue)"></span><strong>最新</strong><span>${money(values.at(-1))} TWD</span></div><div class="legend-row"><span class="dot" style="--c:var(--muted)"></span><strong>區間</strong><span>${money(min)} ~ ${money(max)} TWD</span></div></div></article>`;
     }
     function stockRowsForCharts() {
-      const tw = data.tw.map(row => ({
+      const tw = stockRows("tw").map(row => ({
         label: `${row.code || "-"} ${row.name || ""}`.trim(),
         value: (Number(row.shares) || 0) * (Number(row.price) || 0),
         cost: (Number(row.shares) || 0) * (Number(row.cost) || 0)
       }));
-      const us = data.us.map(row => {
+      const us = stockRows("us").map(row => {
         const fx = Number(data.rates.usd) || 1;
         return {
           label: `${row.code || "-"} ${row.name || ""}`.trim(),
@@ -2355,7 +2369,7 @@
       });
     }
     function usdExposure() {
-      const usStocksUsd = sum(data.us, row => (Number(row.shares) || 0) * (Number(row.price) || 0));
+      const usStocksUsd = sum(stockRows("us"), row => (Number(row.shares) || 0) * (Number(row.price) || 0));
       const usdCash = sum(cashRows().filter(row => normalizeCurrency(row.currency) === "USD"), row => Number(row.amount) || 0);
       return usStocksUsd + usdCash;
     }
@@ -2427,8 +2441,8 @@
           return text === code || text.includes(code) || text.includes(name) || name.includes(text);
         })
         .reduce((total, row) => total + (Number(row.shares) || 0) * (Number(row.price) || 0) * fx, 0);
-      const twValue = matchRows(data.tw || []);
-      const usValue = matchRows(data.us || [], data.rates.usd);
+      const twValue = matchRows(stockRows("tw"));
+      const usValue = matchRows(stockRows("us"), data.rates.usd);
       const fundValue = (data.funds || [])
         .filter(row => String(row.name || "").toUpperCase().includes(text) || text.includes(String(row.name || "").toUpperCase()))
         .reduce((total, row) => total + (Number(row.units) || 0) * (Number(row.nav) || 0), 0);
@@ -2593,8 +2607,8 @@
         if (!Number(row.cost)) issues.push(`${market} ${code} 平均成本為 0`);
         if (!Number(row.shares)) issues.push(`${market} ${code} 持股數為 0`);
       });
-      checkStock(data.tw, "台股");
-      checkStock(data.us, "美股");
+      checkStock(stockRows("tw"), "台股");
+      checkStock(stockRows("us"), "美股");
       cashRows().forEach(row => {
         const currency = normalizeCurrency(row.currency);
         if (!fxRate(currency)) issues.push(`${currency} 匯率未設定`);
@@ -2630,8 +2644,8 @@
       const investment = t.tw + t.us + t.gold + t.silver + t.fund;
       const cash = Math.max(0, t.cash);
       const stockRows = stockRowsForCharts();
-      const twGain = stockValue(data.tw) - stockCost(data.tw);
-      const usGain = stockValue(data.us, data.rates.usd) - stockCost(data.us, data.rates.usd);
+      const twGain = stockValue(stockRows("tw")) - stockCost(stockRows("tw"));
+      const usGain = stockValue(stockRows("us"), data.rates.usd) - stockCost(stockRows("us"), data.rates.usd);
       const goldGain = goldGram() * data.rates.goldGram - goldCost();
       const silverGain = silverOz() * data.rates.silverOz - silverCost();
       const fundGain = (sum(data.funds, r => r.units * r.nav) - sum(data.funds, r => r.cost)) + (sum(data.usdFunds || [], r => r.units * r.nav) - sum(data.usdFunds || [], r => r.cost)) * data.rates.usd;
@@ -2794,7 +2808,7 @@
       const cost = stockCost(rows, fx);
       const gain = value - cost;
       return `
-        ${section(kind, `${title}持股總覽`, "", `<button class="btn green small" data-add="${kind}">+ 新增${title}持股</button>`)}
+        ${section(kind, `${title}持股總覽`, "部位、持股數與平均成本皆由「購買股票紀錄」中尚未賣出的交易自動計算；目前股價可透過匯入報價更新。")}
         <div class="cards">
           ${card("總投入成本", money(cost, currency), currency)}
           ${card("當前總現值", money(value, currency), currency)}
@@ -2804,12 +2818,12 @@
         ${renderStockAnalysisCharts(kind, rows, currency)}
         <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select id="${kind}Sort"><option value="code">依代號排序</option><option value="gain">依損益排序</option><option value="value">依市值排序</option></select></div>
         <article class="panel"><div class="table-wrap"><table>
-          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th><th>操作</th></tr></thead>
+          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th></tr></thead>
           <tbody>${rows.map((r, i) => {
             const rowValue = r.shares * r.price;
             const rowCost = r.shares * r.cost;
             const rowGain = rowValue - rowCost;
-            return `<tr><td>${textInput(r.code, `${kind}.${i}.code`)}</td><td>${textInput(r.name, `${kind}.${i}.name`)}</td><td>${textInput(r.shares, `${kind}.${i}.shares`, "number")}</td><td>${textInput(r.cost, `${kind}.${i}.cost`, "number")}</td><td>${textInput(r.price, `${kind}.${i}.price`, "number")}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><button class="icon-btn" data-del="${kind}.${i}">刪</button></td></tr>`;
+            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
       `;
@@ -2850,7 +2864,7 @@
     }
     function renderMetals(kind) {
       const isGold = kind === "gold";
-      const rows = data[kind];
+      const rows = stockRows(kind);
       const totalWeight = isGold ? goldGram() : silverOz();
       const cost = isGold ? goldCost() : silverCost();
       const value = isGold ? totalWeight * data.rates.goldGram : totalWeight * data.rates.silverOz;
@@ -2974,9 +2988,10 @@
         const gross = shares * (Number(row.price) || 0);
         const fees = (Number(row.fee) || 0) + (Number(row.tax) || 0);
         const key = tradeKey(row);
-        const position = positions.get(key) || { market: row.market || "TW", currency, code: row.code || "", name: row.name || "", bought: 0, sold: 0, shares: 0, basis: 0, realized: 0, soldBasis: 0 };
+        const position = positions.get(key) || { market: row.market || "TW", currency, code: row.code || "", name: row.name || "", bought: 0, sold: 0, shares: 0, basis: 0, realized: 0, soldBasis: 0, lastPrice: 0 };
         position.name = row.name || position.name;
-        position.market = row.market || position.market;
+       position.market = row.market || position.market;
+        if (Number(row.price) > 0) position.lastPrice = Number(row.price);
         if (type === "sell") {
           const avgCost = position.shares ? position.basis / position.shares : 0;
           const soldBasis = avgCost * shares;
@@ -3106,8 +3121,8 @@
     }
     function currentStockGain() {
       return {
-        twGain: stockValue(data.tw) - stockCost(data.tw),
-        usGain: stockValue(data.us, data.rates.usd) - stockCost(data.us, data.rates.usd)
+        twGain: stockValue(stockRows("tw")) - stockCost(stockRows("tw")),
+        usGain: stockValue(stockRows("us"), data.rates.usd) - stockCost(stockRows("us"), data.rates.usd)
       };
     }
     function renderPnlCalendar() {
@@ -3374,8 +3389,8 @@
     }
     function exportCsv() {
       const rows = [["類別", "代號/項目", "名稱", "數量", "成本", "現價/金額", "現值"]];
-      data.tw.forEach(r => rows.push(["台股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
-      data.us.forEach(r => rows.push(["美股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
+      stockRows("tw").forEach(r => rows.push(["台股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
+      stockRows("us").forEach(r => rows.push(["美股", r.code, r.name, r.shares, r.cost, r.price, r.shares * r.price]));
       cashRows().forEach(r => rows.push(["現金", r.currency, r.bank, "", "", r.amount, twdCash(r)]));
       data.gold.forEach(r => rows.push(["黃金", "", r.item, r.gram, r.gold + r.labor, data.rates.goldGram, r.gram * data.rates.goldGram]));
       data.silver.forEach(r => rows.push(["白銀", "", r.item, r.qty * r.oz, r.cost, data.rates.silverOz, r.qty * r.oz * data.rates.silverOz]));
@@ -3389,8 +3404,8 @@
     function exportSymbols() {
       const payload = {
         generatedAt: new Date().toISOString(),
-        tw: data.tw.map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
-        us: data.us.map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
+        tw: stockRows("tw").map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
+        us: stockRows("us").map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
       };
       download("price-symbols.json", JSON.stringify(payload, null, 2), "application/json");
       toast("已匯出 price-symbols.json");
@@ -3398,18 +3413,21 @@
     function applyLatestPrices(payload) {
       const prices = payload.prices || {};
       let updated = 0;
-      const updateRows = (rows, market) => {
-        rows.forEach(row => {
+      const updateRows = (kind, market) => {
+        const cache = data[kind] || (data[kind] = []);
+        stockRows(kind).forEach(row => {
           const key = `${market}:${String(row.code).toUpperCase()}`;
           const quote = prices[key] || prices[String(row.code).toUpperCase()] || prices[row.code];
           if (quote && Number.isFinite(Number(quote.price))) {
-            row.price = Number(quote.price);
+            const saved = cache.find(item => String(item.code || "").toUpperCase() === String(row.code || "").toUpperCase());
+            if (saved) saved.price = Number(quote.price);
+            else cache.push({ code: row.code, name: row.name, price: Number(quote.price) });
             updated += 1;
           }
         });
       };
-      updateRows(data.tw, "TW");
-      updateRows(data.us, "US");
+      updateRows("tw", "TW");
+      updateRows("us", "US");
       localStorage.setItem(storageKey, JSON.stringify(data));
       render();
       toast(updated ? `已更新 ${updated} 筆股價` : "沒有找到可套用的股價");
