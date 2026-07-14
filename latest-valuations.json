@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-07-14T08:15:34+00:00",
+  "generatedAt": "2026-07-14T08:23:41+00:00",
   "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR; ETF NAV/fees can be supplemented in the dashboard",
   "valuations": {
     "TW:0050": {
