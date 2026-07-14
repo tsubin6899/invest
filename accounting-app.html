@@ -1227,6 +1227,66 @@
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
     }
+    /* Richer shared palette and desktop section-title icons */
+    :root {
+      --blue: #2f7f9f;
+      --green: #359274;
+      --purple: #8f64ad;
+      --amber: #d28b2d;
+      --red: #c2574b;
+      --teal: #268b86;
+      --coral: #d8735f;
+    }
+    body {
+      background:
+        radial-gradient(circle at 8% 0%, rgba(95,145,200,.14), transparent 28%),
+        radial-gradient(circle at 92% 12%, rgba(53,146,116,.12), transparent 26%),
+        #edf1f2;
+    }
+    .app-header { background: linear-gradient(118deg, #172033 0%, #1d4657 58%, #31584f 100%); }
+    .kicker { color: #f0ca7d; }
+    .tab.active { background: linear-gradient(135deg, #fffdf8, #edf7f4); color: #173441; }
+    .btn.blue { background: linear-gradient(135deg, #337f9e, #286982); }
+    .btn.green { background: linear-gradient(135deg, #3d9c7c, #2c7d63); }
+    .btn.purple { background: linear-gradient(135deg, #9b69b2, #774d91); }
+    .btn.dark { background: linear-gradient(135deg, #596474, #384352); }
+    .btn.danger { background: linear-gradient(135deg, #c95d4f, #a84038); }
+    .cards .card { position: relative; overflow: hidden; }
+    .cards .card::after { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: var(--blue); }
+    .cards .card:nth-child(4n + 2)::after { background: var(--green); }
+    .cards .card:nth-child(4n + 3)::after { background: var(--amber); }
+    .cards .card:nth-child(4n + 4)::after { background: var(--purple); }
+    .cards .card.dark { background: linear-gradient(145deg, #20384b, #28576a); }
+    .cards .card.accent { background: linear-gradient(145deg, #fff7e8, #fff0cf); }
+    .chart-grid .chart-card:nth-child(4n + 1) { background: linear-gradient(145deg, #fffefb, #f3f8fb); }
+    .chart-grid .chart-card:nth-child(4n + 2) { background: linear-gradient(145deg, #fffefb, #f1f8f4); }
+    .chart-grid .chart-card:nth-child(4n + 3) { background: linear-gradient(145deg, #fffefb, #fff8ec); }
+    .chart-grid .chart-card:nth-child(4n + 4) { background: linear-gradient(145deg, #fffefb, #f8f2fa); }
+    .monthly-pulse { background: linear-gradient(135deg, rgba(243,249,252,.98), rgba(239,248,244,.96) 55%, rgba(250,244,252,.94)); }
+    .invoice-box { border-left: 4px solid rgba(47,127,159,.65); background: linear-gradient(145deg, #fbfdfd, #f3f8f7); }
+    th { background: linear-gradient(180deg, #edf4f2, #e5efec); color: #38545b; }
+    @media (min-width: 981px) {
+      .section-title { display: flex; align-items: center; gap: 9px; }
+      .section-title-icon {
+        box-sizing: border-box;
+        width: 30px;
+        height: 30px;
+        flex: 0 0 30px;
+        padding: 6px;
+        border: 1px solid rgba(47,127,159,.2);
+        border-radius: 9px;
+        color: var(--blue);
+        background: rgba(47,127,159,.1);
+        stroke-width: 2;
+      }
+      .section-title[data-section-tone="green"] .section-title-icon { color: var(--green); border-color: rgba(53,146,116,.22); background: rgba(53,146,116,.11); }
+      .section-title[data-section-tone="amber"] .section-title-icon { color: #a86d1f; border-color: rgba(210,139,45,.25); background: rgba(210,139,45,.12); }
+      .section-title[data-section-tone="purple"] .section-title-icon { color: var(--purple); border-color: rgba(143,100,173,.23); background: rgba(143,100,173,.11); }
+      .section-title[data-section-tone="coral"] .section-title-icon { color: var(--coral); border-color: rgba(216,115,95,.24); background: rgba(216,115,95,.11); }
+      .section-title[data-section-tone="teal"] .section-title-icon { color: var(--teal); border-color: rgba(38,139,134,.24); background: rgba(38,139,134,.11); }
+      .toolbar h2 .section-title-icon { width: 34px; height: 34px; flex-basis: 34px; padding: 7px; border-radius: 10px; }
+    }
+    @media (max-width: 980px) { .section-title-icon { display: none !important; } }
   </style>
 </head>
 <body>
@@ -1666,6 +1726,45 @@
       categoryView: "類",
       analyticsView: "圖"
     };
+    const sectionVisualRules = [
+      [/安全|健康|提醒|風險/, "shield-check", "green"],
+      [/現金流|資金/, "waves", "teal"],
+      [/發票|辨識/, "scan-line", "blue"],
+      [/模板|快速/, "zap", "amber"],
+      [/信用卡|帳單|分期/, "credit-card", "purple"],
+      [/台股|美股|股票|持股|股價/, "chart-candlestick", "coral"],
+      [/黃金|白銀|貴金屬/, "gem", "amber"],
+      [/基金|配置|比例|占比/, "pie-chart", "purple"],
+      [/定期|排程|固定/, "calendar-clock", "teal"],
+      [/觀察/, "binoculars", "purple"],
+      [/股息|配息|收入/, "badge-dollar-sign", "green"],
+      [/支出|預算|費用/, "clipboard-list", "coral"],
+      [/轉帳|交易|買進|賣出/, "arrow-left-right", "blue"],
+      [/行事曆|快照|日期/, "calendar-days", "amber"],
+      [/報表|分析|排行|趨勢|圖表|統計/, "chart-no-axes-combined", "blue"],
+      [/備份|同步|雲端/, "cloud", "purple"],
+      [/匯率|幣別/, "coins", "teal"],
+      [/分類|設定|目標/, "settings-2", "teal"],
+      [/記帳|收支|明細|月結/, "notebook-tabs", "blue"],
+      [/總覽|儀表板|脈搏/, "gauge", "blue"],
+      [/財務|行動中心/, "landmark", "amber"]
+    ];
+    function decorateSectionTitles() {
+      document.querySelectorAll(".view h2, .view h3").forEach(heading => {
+        if (heading.dataset.sectionIcon) return;
+        const title = heading.textContent.trim();
+        const [, icon, tone] = sectionVisualRules.find(([pattern]) => pattern.test(title)) || [null, "sparkles", "purple"];
+        const marker = document.createElement("i");
+        marker.className = "section-title-icon";
+        marker.dataset.lucide = icon;
+        marker.setAttribute("aria-hidden", "true");
+        marker.textContent = "•";
+        heading.prepend(marker);
+        heading.classList.add("section-title");
+        heading.dataset.sectionIcon = icon;
+        heading.dataset.sectionTone = tone;
+      });
+    }
     const entryTypeButtons = [...document.querySelectorAll("[data-type]")];
     const form = document.getElementById("entryForm");
     const editDialog = document.getElementById("editDialog");
@@ -3206,6 +3305,7 @@
         button.setAttribute("aria-label", button.title);
         button.innerHTML = '<i data-lucide="trash-2" aria-hidden="true"></i>';
       });
+      decorateSectionTitles();
       if (window.lucide) window.lucide.createIcons();
     }
     function download(filename, content, type) {
