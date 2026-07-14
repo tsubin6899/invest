@@ -2218,9 +2218,15 @@
           rawValue: gain
         };
       });
+      const contributionItems = gainItems.map(item => ({
+        ...item,
+        color: item.rawValue >= 0 ? "var(--green)" : "var(--red)"
+      }));
       return `<div class="chart-pair stock-overview-charts">
         ${renderPieChart("每支股票持有比例", valueItems, "持股市值", currency)}
-        ${renderPieChart("未實現損益各支股票比例", gainItems, "損益絕對值", currency)}
+        ${renderPieChart("各股損益波動比例", gainItems, "損益絕對值", currency)}
+      </div><div class="chart-grid stock-overview-charts">
+        ${renderBarChart("未實現損益貢獻（正負值）", contributionItems, currency)}
       </div>`;
     }
     function stockReturnRankRows(rows) {
