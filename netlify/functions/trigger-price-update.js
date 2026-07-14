@@ -32,6 +32,15 @@ exports.handler = async (event) => {
   const repo = process.env.GITHUB_REPO;
   const workflow = process.env.GITHUB_WORKFLOW || "update-market-data.yml";
   const ref = process.env.GITHUB_REF || "main";
+  let symbolsJson = "";
+  if (event.body) {
+    try {
+      const symbols = JSON.parse(event.body);
+      if (Array.isArray(symbols.tw) && Array.isArray(symbols.us)) symbolsJson = JSON.stringify(symbols);
+    } catch {
+      return response(400, { ok: false, error: "Invalid symbols payload" }, origin);
+    }
+  }
 
   if (!token || !owner || !repo) {
     return response(500, {
@@ -49,7 +58,7 @@ exports.handler = async (event) => {
       "Content-Type": "application/json",
       "User-Agent": "personal-assets-dashboard"
     },
-    body: JSON.stringify({ ref })
+    body: JSON.stringify({ ref, inputs: symbolsJson ? { symbols_json: symbolsJson } : {} })
   });
 
   if (!githubResponse.ok) {

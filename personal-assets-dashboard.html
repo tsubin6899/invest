@@ -447,6 +447,14 @@
     .mobile-quick-nav {
       display: none;
     }
+    .watchlist-rows { display: grid; gap: 12px; padding: 14px; }
+    .watchlist-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(360px, 1fr); gap: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.55); }
+    .watchlist-fields { display: grid; grid-template-columns: 120px minmax(140px, 1fr); gap: 8px 10px; align-items: center; }
+    .watchlist-fields label { color: var(--muted); font-size: 12px; font-weight: 700; }
+    .watchlist-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; gap: 10px; align-items: center; }
+    .watchlist-metrics span { display: grid; gap: 3px; }
+    .watchlist-metrics small { color: var(--muted); font-size: 11px; }
+    @media (max-width: 720px) { .watchlist-row { grid-template-columns: 1fr; } .watchlist-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
     .mobile-more-sheet {
       width: min(100% - 24px, 440px);
       max-height: min(78vh, 620px);
@@ -3059,10 +3067,10 @@
     }
     function renderWatchlistBlock(key, title, market, currency) {
       const rows = data[key] || [];
-      return `<article class="panel"><div class="panel-pad"><div class="section-head"><div><h3>${title}</h3><p class="section-note">加入預計買進、但仍在觀察的標的；不計入持倉或資產總額，使用「更新股價匯率」即可同步最新股價與可用估值資料。</p></div><button class="btn green small" data-add="${key}">+ 新增${title}</button></div></div><div class="table-wrap"><table><thead><tr><th>股票代號</th><th>股票名稱</th><th>最新股價</th><th>本益比／折溢價</th><th>分析購入／賣出</th><th>觀察理由</th><th>操作</th></tr></thead><tbody>${rows.map((row, index) => {
+      return `<article class="panel"><div class="panel-pad"><div class="section-head"><div><h3>${title}</h3><p class="section-note">觀察名單不計入持倉或資產總額。更新股價會一併查詢此處的標的。</p></div><button class="btn green small" data-add="${key}">+ 新增${title}</button></div></div><div class="watchlist-rows">${rows.map((row, index) => {
         const signal = valuationSignal({ ...row, market });
-        return `<tr><td>${textInput(row.code || "", `${key}.${index}.code`)}</td><td>${textInput(row.name || "", `${key}.${index}.name`)}</td><td>${moneyFixed(row.price || 0, currency, 2)}</td><td>${signal.metric}</td><td class="${signal.tone}">${signal.action}</td><td>${textInput(row.note || "", `${key}.${index}.note`)}</td><td><button class="icon-btn" data-del="${key}.${index}">刪</button></td></tr>`;
-      }).join("") || `<tr><td colspan="7" class="muted">尚未加入觀察標的</td></tr>`}</tbody></table></div></article>`;
+        return `<div class="watchlist-row"><div class="watchlist-fields"><label>股票代號</label>${textInput(row.code || "", `${key}.${index}.code`)}<label>股票名稱</label>${textInput(row.name || "", `${key}.${index}.name`)}<label>觀察理由</label>${textInput(row.note || "", `${key}.${index}.note`)}</div><div class="watchlist-metrics"><span><small>最新股價</small><strong>${moneyFixed(row.price || 0, currency, 2)}</strong></span><span><small>本益比／折溢價</small><strong>${signal.metric}</strong></span><span><small>分析購入／賣出</small><strong class="${signal.tone}">${signal.action}</strong></span><button class="icon-btn" data-del="${key}.${index}">刪</button></div></div>`;
+      }).join("") || `<div class="muted">尚未加入觀察標的</div>`}</div></article>`;
     }
     function renderWatchlist() {
       return `${section("watchlist", "股票觀察名單", "依台股與美股分開管理；估值操作提示只根據本益比或 ETF 折溢價率，不構成投資建議。")}${renderWatchlistBlock("twWatchlist", "台股觀察名單", "TW", "TWD")}${renderWatchlistBlock("usWatchlist", "美股觀察名單", "US", "USD")}`;
@@ -3526,12 +3534,15 @@
       markMeta("lastExportAt");
       render();
     }
-    function exportSymbols() {
-      const payload = {
+    function marketSymbolsPayload() {
+      return {
         generatedAt: new Date().toISOString(),
         tw: [...stockRows("tw"), ...(data.twWatchlist || [])].map(row => ({ code: row.code, name: row.name })).filter(row => row.code),
         us: [...stockRows("us"), ...(data.usWatchlist || [])].map(row => ({ code: row.code, name: row.name })).filter(row => row.code)
       };
+    }
+    function exportSymbols() {
+      const payload = marketSymbolsPayload();
       download("price-symbols.json", JSON.stringify(payload, null, 2), "application/json");
       toast("已匯出 price-symbols.json");
     }
@@ -3646,13 +3657,13 @@
         // file:// cannot reliably read sibling JSON; manual import remains available.
       }
     }
-    async function triggerLocalMarketUpdate() {
-      const response = await fetch("/api/update-prices", { method: "POST" });
+    async function triggerLocalMarketUpdate(symbols) {
+      const response = await fetch("/api/update-prices", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(symbols) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     }
-    async function triggerCloudMarketUpdate() {
-      const response = await fetch(cloudUpdateEndpoint(), { method: "POST" });
+    async function triggerCloudMarketUpdate(symbols) {
+      const response = await fetch(cloudUpdateEndpoint(), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(symbols) });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return response.json();
     }
@@ -3667,13 +3678,14 @@
       button.textContent = "更新中...";
       try {
         const before = await fetchMarketData().catch(() => null);
+        const symbols = marketSymbolsPayload();
         try {
-          await triggerLocalMarketUpdate();
+          await triggerLocalMarketUpdate(symbols);
           const payload = await fetchMarketData();
           if (!(await applyMarketData(payload))) toast("沒有找到可套用的股價或匯率");
           return;
         } catch {
-          await triggerCloudMarketUpdate();
+          await triggerCloudMarketUpdate(symbols);
         }
         toast("已送出雲端更新，正在等待 GitHub 完成...");
         const payload = await waitForFreshMarketData(before ? marketStamp(before) : "");

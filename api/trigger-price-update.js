@@ -21,6 +21,15 @@ export default async function handler(req, res) {
   const repo = process.env.GITHUB_REPO;
   const workflow = process.env.GITHUB_WORKFLOW || "update-market-data.yml";
   const ref = process.env.GITHUB_REF || "main";
+  let symbolsJson = "";
+  if (req.body) {
+    const symbols = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+    if (!Array.isArray(symbols.tw) || !Array.isArray(symbols.us)) {
+      send(res, 400, { ok: false, error: "Invalid symbols payload" });
+      return;
+    }
+    symbolsJson = JSON.stringify(symbols);
+  }
 
   if (!token || !owner || !repo) {
     send(res, 500, {
@@ -39,7 +48,7 @@ export default async function handler(req, res) {
       "Content-Type": "application/json",
       "User-Agent": "personal-assets-dashboard"
     },
-    body: JSON.stringify({ ref })
+    body: JSON.stringify({ ref, inputs: symbolsJson ? { symbols_json: symbolsJson } : {} })
   });
 
   if (!githubResponse.ok) {

@@ -2,6 +2,11 @@ name: Update market data
 
 on:
   workflow_dispatch:
+    inputs:
+      symbols_json:
+        description: "Current dashboard symbols, including watchlists"
+        required: false
+        type: string
   schedule:
     - cron: "30 5 * * 1-5"
 
@@ -22,6 +27,12 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Apply requested symbol list
+        if: ${{ inputs.symbols_json != '' }}
+        env:
+          SYMBOLS_JSON: ${{ inputs.symbols_json }}
+        run: python -c "import os; from pathlib import Path; Path('price-symbols.json').write_text(os.environ['SYMBOLS_JSON'], encoding='utf-8')"
+
       - name: Fetch latest prices and exchange rates
         run: python update_prices.py
 
@@ -29,4 +40,4 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           commit_message: "Update market data"
-          file_pattern: latest-prices.json latest-rates.json
+          file_pattern: price-symbols.json latest-prices.json latest-rates.json latest-valuations.json
