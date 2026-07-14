@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-13T12:48:40+00:00",
+  "generatedAt": "2026-07-13T14:52:53+00:00",
   "prices": {
     "TW:0050": {
       "symbol": "0050",
@@ -11,7 +11,7 @@
       "change": 0.2,
       "changePercent": 0.189,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:34+00:00"
+      "fetchedAt": "2026-07-13T14:52:47+00:00"
     },
     "TW:009816": {
       "symbol": "009816",
@@ -23,7 +23,7 @@
       "change": 0.02,
       "changePercent": 0.1313,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:35+00:00"
+      "fetchedAt": "2026-07-13T14:52:48+00:00"
     },
     "TW:00981A": {
       "symbol": "00981A",
@@ -35,7 +35,7 @@
       "change": -0.6,
       "changePercent": -2.0033,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:36+00:00"
+      "fetchedAt": "2026-07-13T14:52:49+00:00"
     },
     "TW:00988A": {
       "symbol": "00988A",
@@ -47,7 +47,7 @@
       "change": -0.52,
       "changePercent": -2.7126,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:37+00:00"
+      "fetchedAt": "2026-07-13T14:52:50+00:00"
     },
     "TW:00991A": {
       "symbol": "00991A",
@@ -59,7 +59,7 @@
       "change": -0.46,
       "changePercent": -2.3578,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:39+00:00"
+      "fetchedAt": "2026-07-13T14:52:51+00:00"
     },
     "TW:2330": {
       "symbol": "2330",
@@ -71,7 +71,7 @@
       "change": 25.0,
       "changePercent": 1.0352,
       "source": "TWSE MIS official API",
-      "fetchedAt": "2026-07-13T12:48:40+00:00"
+      "fetchedAt": "2026-07-13T14:52:53+00:00"
     }
   },
   "errors": []
