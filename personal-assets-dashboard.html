@@ -508,6 +508,27 @@
     .valuation-reason { min-width: 210px; max-width: 320px; color: #46565d; font-size: 12px; line-height: 1.55; }
     .valuation-score { display: inline-flex; width: max-content; padding: 2px 7px; border-radius: 999px; background: #f0f3f2; color: #57666b; font-size: 10px; font-weight: 800; }
     .research-btn { white-space: nowrap; }
+    .stock-holdings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; padding: 14px; }
+    .stock-holding-card { display: grid; gap: 14px; min-width: 0; padding: 16px; border: 1px solid #dce5e2; border-radius: 14px; background: linear-gradient(145deg, rgba(255,255,255,.96), rgba(247,250,249,.88)); box-shadow: 0 8px 20px rgba(31,55,59,.05); }
+    .stock-card-head, .stock-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .stock-card-identity { display: grid; gap: 3px; min-width: 0; }
+    .stock-card-code { color: #357186; font-size: 12px; font-weight: 800; letter-spacing: .03em; }
+    .stock-card-name { overflow: hidden; color: var(--ink); font-size: 18px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+    .stock-card-value { display: grid; gap: 4px; padding: 13px 14px; border-radius: 11px; background: #eef6f4; }
+    .stock-card-value small, .stock-card-metrics small, .stock-card-assessment small { color: var(--muted); font-size: 11px; }
+    .stock-card-value strong { color: #214a59; font-size: 22px; line-height: 1.1; }
+    .stock-card-value .gain { font-size: 13px; font-weight: 800; }
+    .stock-card-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .stock-card-metrics span { display: grid; gap: 3px; min-width: 0; padding: 9px 8px; border-left: 2px solid #dbe8e4; }
+    .stock-card-metrics strong { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+    .stock-card-assessment { display: grid; gap: 8px; padding: 12px; border-radius: 10px; background: #f7f6f2; }
+    .stock-card-assessment-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+    .stock-card-assessment .valuation-action { min-width: 0; }
+    .stock-card-reason { color: #46565d; font-size: 12px; line-height: 1.55; }
+    .stock-card-footer { align-items: flex-end; }
+    .stock-card-footer .valuation-source { max-width: calc(100% - 82px); }
+    @media (max-width: 980px) { .stock-holdings { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { .stock-holdings { padding: 10px; gap: 10px; } .stock-holding-card { padding: 13px; gap: 11px; } .stock-card-name { font-size: 16px; } .stock-card-value strong { font-size: 20px; } .stock-card-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .stock-card-metrics span { padding: 7px 6px; } }
     .watchlist-insight { display: grid; gap: 6px; padding: 10px 11px; border-radius: 9px; background: #f5f8f7; color: #44575d; font-size: 12px; line-height: 1.5; }
     .watchlist-insight-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .watchlist-insight small { color: var(--muted); }
@@ -3420,18 +3441,23 @@
         </div>
         ${renderStockCharts(rows, currency)}
         ${renderStockAnalysisCharts(kind, rows, currency)}
-        <div class="toolbox toolbar"><input class="search" id="${kind}Search" placeholder="搜尋代號或名稱"><select data-stock-sort="${kind}"><option value="value" ${stockSort[kind] === "value" ? "selected" : ""}>依市值排序</option><option value="gain" ${stockSort[kind] === "gain" ? "selected" : ""}>依損益排序</option><option value="code" ${stockSort[kind] === "code" ? "selected" : ""}>依代號排序</option></select></div>
-        <article class="panel"><div class="table-wrap"><table>
-          <thead><tr><th>股票代號</th><th>股票名稱</th><th>持股數</th><th>平均成本</th><th>目前股價</th><th>當前市值</th><th>未實現損益</th><th>報酬率</th><th>類型</th><th>估值資料</th><th>長期持有評估</th><th>主要理由</th><th>資料來源／日期</th><th>研究設定</th></tr></thead>
-          <tbody>${rows.map((r, i) => {
+        <div class="toolbox toolbar"><input class="search" data-stock-search="${kind}" placeholder="搜尋代號或名稱"><select data-stock-sort="${kind}"><option value="value" ${stockSort[kind] === "value" ? "selected" : ""}>依市值排序</option><option value="gain" ${stockSort[kind] === "gain" ? "selected" : ""}>依損益排序</option><option value="code" ${stockSort[kind] === "code" ? "selected" : ""}>依代號排序</option></select></div>
+        <article class="panel"><div class="stock-holdings">${rows.map(r => {
             const rowValue = r.shares * r.price;
             const rowCost = r.shares * r.cost;
             const rowGain = rowValue - rowCost;
+            const rowReturn = rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00";
             const signal = valuationSignal(r);
             const metricClass = signal.metric.includes("待補") ? "watch-pending-metric" : "";
-            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><span class="valuation-type ${signal.type}">${signal.typeLabel}</span></td><td class="${metricClass}">${signal.metric}</td><td><div class="valuation-action ${signal.tone}"><strong>${signal.action}</strong><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div></td><td><div class="valuation-reason">${signal.reasons.map(escapeHtml).join("<br>")}</div></td><td><div class="valuation-source">${valuationSourceHtml(signal)}</div></td><td><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey(r))}">設定</button></td></tr>`;
-          }).join("")}</tbody>
-        </table></div></article>
+            const searchText = escapeHtml(`${r.code || ""} ${r.name || ""}`.toLowerCase());
+            return `<section class="stock-holding-card" data-stock-card="${kind}" data-stock-text="${searchText}">
+              <div class="stock-card-head"><div class="stock-card-identity"><span class="stock-card-code">${escapeHtml(r.code)}</span><strong class="stock-card-name">${escapeHtml(r.name)}</strong></div><span class="valuation-type ${signal.type}">${signal.typeLabel}</span></div>
+              <div class="stock-card-value"><small>當前市值</small><strong>${money(rowValue, currency)}</strong><span class="${rowGain >= 0 ? "gain" : ""}">未實現損益 ${money(rowGain, currency)}（${rowReturn}%）</span></div>
+              <div class="stock-card-metrics"><span><small>持股數</small><strong>${money(r.shares, "")}</strong></span><span><small>平均成本</small><strong>${moneyFixed(r.cost, currency, 2)}</strong></span><span><small>目前股價</small><strong>${moneyFixed(r.price, currency, 2)}</strong></span><span><small>估值資料</small><strong class="${metricClass}">${signal.metric}</strong></span></div>
+              <div class="stock-card-assessment"><div class="stock-card-assessment-head"><div class="valuation-action ${signal.tone}"><small>長期持有評估</small><strong>${signal.action}</strong></div><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div><div class="stock-card-reason">${signal.reasons.map(escapeHtml).join("<br>")}</div></div>
+              <div class="stock-card-footer"><div class="valuation-source">${valuationSourceHtml(signal)}</div><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey(r))}">研究設定</button></div>
+            </section>`;
+          }).join("") || `<div class="muted">尚未有持股明細</div>`}</div></article>
       `;
     }
     function renderCash() {
@@ -4004,6 +4030,12 @@
       document.querySelectorAll("[data-stock-sort]").forEach(el => el.addEventListener("change", () => {
         stockSort[el.dataset.stockSort] = el.value;
         render();
+      }));
+      document.querySelectorAll("[data-stock-search]").forEach(el => el.addEventListener("input", () => {
+        const query = el.value.trim().toLowerCase();
+        document.querySelectorAll(`[data-stock-card="${el.dataset.stockSearch}"]`).forEach(card => {
+          card.hidden = Boolean(query) && !String(card.dataset.stockText || "").includes(query);
+        });
       }));
       document.querySelectorAll("[data-add]").forEach(el => el.addEventListener("click", () => addRow(el.dataset.add)));
       document.querySelectorAll("[data-research-key]").forEach(el => el.addEventListener("click", () => openValuationDialog(el.dataset.researchKey)));
