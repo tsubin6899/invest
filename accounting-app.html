@@ -603,30 +603,6 @@
     .pulse-label { display: block; color: var(--muted); font-size: 12px; }
     .pulse-value { display: block; margin-top: 8px; color: var(--ink); font-size: 22px; line-height: 1.05; font-weight: 700; }
     .pulse-note { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; line-height: 1.4; }
-    .quick-amounts {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 7px;
-      margin-top: -2px;
-      padding: 8px 9px;
-      border: 1px dashed #c8d6d3;
-      border-radius: 8px;
-      background: #f6f9f8;
-    }
-    .quick-amounts-label { margin-right: 2px; color: var(--muted); font-size: 11px; }
-    .quick-amount-chip {
-      min-height: 30px;
-      padding: 0 10px;
-      border: 1px solid #cbd8d5;
-      border-radius: 999px;
-      color: #315b67;
-      background: #fffefb;
-      cursor: pointer;
-      font-size: 12px;
-      font-weight: 650;
-    }
-    .quick-amount-chip:hover { border-color: var(--blue); background: #edf6f7; }
     .label {
       color: inherit;
       opacity: .72;
@@ -1371,7 +1347,6 @@
             <form id="entryForm" class="form-grid">
               <label>日期<input id="date" type="date" required></label>
               <label>金額<input id="amount" type="number" min="0" step="1" inputmode="decimal" required></label>
-              <div class="quick-amounts full" id="quickAmounts" aria-label="常用金額"></div>
               <label>分類<select id="category" required></select></label>
               <label>項目<select id="item"></select></label>
               <label>帳戶<select id="account" required></select></label>
@@ -2480,7 +2455,6 @@
       currentType = type;
       entryTypeButtons.forEach(button => button.classList.toggle("active", button.dataset.type === type));
       refreshLists();
-      renderQuickAmounts();
     }
     function refreshLists() {
       const merchantCounts = new Map();
@@ -2997,23 +2971,6 @@
           ${pulseCard("記帳覆蓋天數", `${coverageDays} / ${elapsedDays} 天`, coverageRatio >= .7 ? "本月記帳持續性良好" : "補齊漏記可提升預估準確度", coverageRatio >= .7 ? "good" : "watch")}
         </div>`;
     }
-    function renderQuickAmounts() {
-      const target = document.getElementById("quickAmounts");
-      if (!target) return;
-      const recent = [...ledger.entries]
-        .filter(row => row.type === currentType && Number(row.amount) > 0)
-        .sort((a, b) => String(b.createdAt || b.date || "").localeCompare(String(a.createdAt || a.date || "")));
-      const amounts = [];
-      recent.forEach(row => {
-        const amount = Number(row.amount);
-        if (!amounts.includes(amount) && amounts.length < 5) amounts.push(amount);
-      });
-      const defaults = currentType === "income" ? [1000, 5000, 10000, 30000] : [50, 100, 200, 500];
-      defaults.forEach(amount => {
-        if (!amounts.includes(amount) && amounts.length < 5) amounts.push(amount);
-      });
-      target.innerHTML = `<span class="quick-amounts-label">${recent.length ? "最近常用" : "快速金額"}</span>${amounts.map(amount => `<button class="quick-amount-chip" type="button" data-quick-amount="${amount}">NT$${money(amount)}</button>`).join("")}`;
-    }
     function card(label, value, unit, cls = "") {
       return `<article class="card ${cls}"><span class="label">${label}</span><strong class="number">${value}</strong><span class="unit">${unit}</span></article>`;
     }
@@ -3317,7 +3274,6 @@
       updateMobileHeaderOffset();
       refreshLists();
       renderMonthlyPulse();
-      renderQuickAmounts();
       const rows = filteredEntries();
       renderCards(rows);
       renderAccountCreditSummary();
@@ -3453,13 +3409,6 @@
       toast("已新增記帳");
     });
     document.addEventListener("click", event => {
-      const quickAmount = event.target.closest("[data-quick-amount]");
-      if (quickAmount) {
-        const amount = document.getElementById("amount");
-        amount.value = quickAmount.dataset.quickAmount;
-        amount.focus();
-        return;
-      }
       if (event.target.closest("[data-mobile-more]")) {
         document.getElementById("mobileMoreSheet")?.showModal();
         return;
