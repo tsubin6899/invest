@@ -1,6 +1,5 @@
 {
-<<<<<<< HEAD
-  "generatedAt": "2026-07-15T01:20:49+00:00",
+  "generatedAt": "2026-07-15T01:29:51+00:00",
   "source": "Bank of Taiwan daily CSV",
   "rates": {
     "TWD": 1.0,
@@ -15,23 +14,6 @@
     "EUR": 36.5435,
     "KRW": 0.01985,
     "CNY": 4.7226
-=======
-  "generatedAt": "2026-07-14T08:23:41+00:00",
-  "source": "Bank of Taiwan daily CSV",
-  "rates": {
-    "TWD": 1.0,
-    "USD": 32.1145,
-    "HKD": 4.0725,
-    "GBP": 42.7405,
-    "AUD": 22.1865,
-    "CAD": 22.6915,
-    "SGD": 24.794,
-    "JPY": 0.1961,
-    "THB": 0.8866,
-    "EUR": 36.431,
-    "KRW": 0.0198,
-    "CNY": 4.7196
->>>>>>> 5875b738f65bffdc99a8cca53822b8d408fb7575
   },
   "errors": []
 }

@@ -10,7 +10,7 @@ The workflow at `.github/workflows/update-market-data.yml` updates:
 - `latest-rates.json`
 - `latest-valuations.json`
 
-Valuation sources are TWSE OpenAPI, TPEx OpenAPI, SEC EDGAR Company Facts, WantGoo ETF NAV/premium data, and the SITCA daily NAV open-data file. WantGoo is attempted first for Taiwan ETFs; SITCA supplies a stable official fallback when the third-party endpoint rejects automated requests. ETF expense ratio, tracking difference, and concentration can still be supplemented from the dashboard research-data dialog.
+Valuation sources are TWSE OpenAPI, TPEx OpenAPI, SEC EDGAR Company Facts, WantGoo ETF NAV/premium data, the SITCA daily NAV open-data file, and CMoney overview pages for the configured US ETFs QQQ and VT. WantGoo is attempted first for Taiwan ETFs; SITCA supplies a stable official fallback when the third-party endpoint rejects automated requests. CMoney supplies the current premium/discount shown on each ETF overview page. ETF expense ratio, tracking difference, and concentration can still be supplemented from the dashboard research-data dialog.
 
 It runs on weekdays at 13:30 Taipei time and can also be triggered manually or by the web button.
 

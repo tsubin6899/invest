@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -25,6 +26,10 @@ SEC_USER_AGENT = "PersonalAssetDashboard/2.0 contact=dashboard-maintainer@exampl
 WANTGOO_ETF_PAGE_URL = "https://www.wantgoo.com/stock/etf/net-value"
 WANTGOO_ETF_DATA_URL = "https://www.wantgoo.com/stock/etf/daily-value-data"
 SITCA_DAILY_NAV_URL = "https://www.sitca.org.tw/MemberK0000/F/03/nav.csv"
+CMONEY_US_ETF_URLS = {
+    "QQQ": "https://www.cmoney.tw/etf/us/QQQ",
+    "VT": "https://www.cmoney.tw/etf/us/VT",
+}
 
 
 def now_iso() -> str:
@@ -576,6 +581,68 @@ def tw_etf_valuations() -> tuple[dict[str, dict], list[dict[str, str]], list[dic
     return combined, references, errors
 
 
+def cmoney_us_etf_valuation(code: str) -> dict:
+    normalized_code = normalize_code(code)
+    url = CMONEY_US_ETF_URLS.get(normalized_code)
+    if not url:
+        raise KeyError(f"No CMoney ETF reference configured for {normalized_code}")
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=35) as response:
+        html = decode_response_bytes(response.read())
+
+    # The live overview embeds the current premium/discount in Nuxt SSR state.
+    # Do not use /discountpremium: that route currently exposes an old sample table.
+    match = re.search(
+        r'trackingError\s*:\s*\{.*?premAndDiscount\s*:\s*"([+-]?\d+(?:\.\d+)?)%"',
+        html,
+        flags=re.DOTALL,
+    )
+    if not match:
+        raise RuntimeError(f"CMoney overview returned no usable premium for {normalized_code}")
+    premium = float(match.group(1))
+    return {
+        "assetType": "etf",
+        "metric": "premium",
+        "value": round(premium, 4),
+        "premium": round(premium, 4),
+        "source": "CMoney 美股ETF 折溢價（概覽）",
+        "referenceUrl": url,
+        "referenceLabel": "CMoney ETF 資料",
+        "asOf": datetime.now(timezone.utc).date().isoformat(),
+        "asOfBasis": "fetch-date",
+        "fetchedAt": now_iso(),
+        "dataStatus": "current",
+        "stale": False,
+    }
+
+
+def cmoney_us_etf_valuations(us_rows: list[dict[str, str]]) -> tuple[dict[str, dict], list[dict[str, str]]]:
+    requested_codes = {
+        normalize_code(row.get("code"))
+        for row in us_rows
+        if normalize_code(row.get("code")) in CMONEY_US_ETF_URLS
+    }
+    values: dict[str, dict] = {}
+    references: list[dict[str, str]] = []
+    for code in sorted(requested_codes):
+        url = CMONEY_US_ETF_URLS[code]
+        try:
+            values[code] = cmoney_us_etf_valuation(code)
+            references.append({"name": f"CMoney 美股ETF {code}", "url": url, "status": "available"})
+            print(f"OK US ETF premium from CMoney:{code} -> {values[code]['premium']}%")
+        except Exception as exc:  # noqa: BLE001 - keep prior data or a manual-needed classification.
+            references.append({"name": f"CMoney 美股ETF {code}", "url": url, "status": "unavailable", "error": str(exc)})
+            print(f"FAIL US ETF premium from CMoney:{code} - {exc}", file=sys.stderr)
+    return values, references
+
+
 def load_previous_valuations() -> dict[str, dict]:
     try:
         payload = json.loads(VALUATIONS_OUTPUT_FILE.read_text(encoding="utf-8-sig"))
@@ -640,6 +707,8 @@ def update_valuations(symbols: dict[str, list[dict[str, str]]], prices: dict[str
             }
 
     us_rows = [row for row in symbols.get("us", []) if normalize_code(row.get("code"))]
+    cmoney_etf_values, cmoney_reference_sources = cmoney_us_etf_valuations(us_rows)
+    reference_sources.extend(cmoney_reference_sources)
     try:
         ticker_map = sec_ticker_map()
     except Exception as exc:  # noqa: BLE001 - keep classifications and prior metrics.
@@ -659,14 +728,21 @@ def update_valuations(symbols: dict[str, list[dict[str, str]]], prices: dict[str
         name = str(row.get("name") or "").upper()
         is_etf = instrument_type == "ETF" or "ETF" in name
         if is_etf:
-            valuations[key] = {
-                "assetType": "etf",
-                "metric": None,
-                "value": None,
-                "source": "Yahoo instrument classification; fund metrics require manual or issuer data",
-                "asOf": datetime.now(timezone.utc).date().isoformat(),
-                "dataStatus": "manual-needed",
-            }
+            if code in cmoney_etf_values:
+                valuations[key] = cmoney_etf_values[code]
+            elif key in previous and parse_market_number(previous[key].get("premium")) is not None:
+                valuations[key] = {**previous[key], "dataStatus": "stale", "stale": True}
+            else:
+                valuations[key] = {
+                    "assetType": "etf",
+                    "metric": None,
+                    "value": None,
+                    "source": "Yahoo instrument classification; fund metrics require manual or issuer data",
+                    "referenceUrl": CMONEY_US_ETF_URLS.get(code, ""),
+                    "referenceLabel": "CMoney ETF 資料" if code in CMONEY_US_ETF_URLS else "",
+                    "asOf": "",
+                    "dataStatus": "manual-needed",
+                }
             continue
         cik = ticker_map.get(code)
         if cik:
@@ -691,9 +767,9 @@ def update_valuations(symbols: dict[str, list[dict[str, str]]], prices: dict[str
             }
 
     output = {
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "generatedAt": now_iso(),
-        "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA ETF NAV",
+        "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA Taiwan ETF NAV + CMoney US ETF premium",
         "referenceSources": reference_sources,
         "valuations": valuations,
         "errors": errors,

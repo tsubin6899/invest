@@ -1,8 +1,7 @@
 {
-<<<<<<< HEAD
-  "schemaVersion": 3,
-  "generatedAt": "2026-07-15T01:20:49+00:00",
-  "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA ETF NAV",
+  "schemaVersion": 4,
+  "generatedAt": "2026-07-15T01:29:51+00:00",
+  "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA Taiwan ETF NAV + CMoney US ETF premium",
   "referenceSources": [
     {
       "name": "WantGoo ETF 淨值及折溢價",
@@ -14,13 +13,18 @@
       "name": "投信投顧公會每日淨值",
       "url": "https://www.sitca.org.tw/MemberK0000/F/03/nav.csv",
       "status": "available"
+    },
+    {
+      "name": "CMoney 美股ETF QQQ",
+      "url": "https://www.cmoney.tw/etf/us/QQQ",
+      "status": "available"
+    },
+    {
+      "name": "CMoney 美股ETF VT",
+      "url": "https://www.cmoney.tw/etf/us/VT",
+      "status": "available"
     }
   ],
-=======
-  "schemaVersion": 2,
-  "generatedAt": "2026-07-14T08:23:41+00:00",
-  "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR; ETF NAV/fees can be supplemented in the dashboard",
->>>>>>> 5875b738f65bffdc99a8cca53822b8d408fb7575
   "valuations": {
     "TW:0050": {
       "assetType": "etf",
@@ -496,19 +500,31 @@
     },
     "US:VT": {
       "assetType": "etf",
-      "metric": null,
-      "value": null,
-      "source": "Yahoo instrument classification; fund metrics require manual or issuer data",
+      "metric": "premium",
+      "value": 0.12,
+      "premium": 0.12,
+      "source": "CMoney 美股ETF 折溢價（概覽）",
+      "referenceUrl": "https://www.cmoney.tw/etf/us/VT",
+      "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-15",
-      "dataStatus": "manual-needed"
+      "asOfBasis": "fetch-date",
+      "fetchedAt": "2026-07-15T01:29:20+00:00",
+      "dataStatus": "current",
+      "stale": false
     },
     "US:QQQ": {
       "assetType": "etf",
-      "metric": null,
-      "value": null,
-      "source": "Yahoo instrument classification; fund metrics require manual or issuer data",
+      "metric": "premium",
+      "value": -0.02,
+      "premium": -0.02,
+      "source": "CMoney 美股ETF 折溢價（概覽）",
+      "referenceUrl": "https://www.cmoney.tw/etf/us/QQQ",
+      "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-15",
-      "dataStatus": "manual-needed"
+      "asOfBasis": "fetch-date",
+      "fetchedAt": "2026-07-15T01:29:20+00:00",
+      "dataStatus": "current",
+      "stale": false
     },
     "US:SKHY": {
       "assetType": "stock",
