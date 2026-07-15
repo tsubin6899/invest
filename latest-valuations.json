@@ -1,13 +1,13 @@
 {
   "schemaVersion": 4,
-  "generatedAt": "2026-07-15T01:29:51+00:00",
+  "generatedAt": "2026-07-15T06:36:53+00:00",
   "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA Taiwan ETF NAV + CMoney US ETF premium",
   "referenceSources": [
     {
       "name": "WantGoo ETF 淨值及折溢價",
       "url": "https://www.wantgoo.com/stock/etf/net-value",
       "status": "unavailable",
-      "error": "HTTP Error 400: Bad Request"
+      "error": "HTTP Error 403: Forbidden"
     },
     {
       "name": "投信投顧公會每日淨值",
@@ -508,7 +508,7 @@
       "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-15",
       "asOfBasis": "fetch-date",
-      "fetchedAt": "2026-07-15T01:29:20+00:00",
+      "fetchedAt": "2026-07-15T06:36:46+00:00",
       "dataStatus": "current",
       "stale": false
     },
@@ -522,7 +522,7 @@
       "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-15",
       "asOfBasis": "fetch-date",
-      "fetchedAt": "2026-07-15T01:29:20+00:00",
+      "fetchedAt": "2026-07-15T06:36:44+00:00",
       "dataStatus": "current",
       "stale": false
     },
