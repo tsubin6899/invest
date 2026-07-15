@@ -504,6 +504,7 @@
     .valuation-action { display: grid; gap: 4px; min-width: 150px; }
     .valuation-action strong { font-size: 13px; line-height: 1.35; }
     .valuation-action small, .valuation-source { color: var(--muted); font-size: 10px; line-height: 1.45; }
+    .valuation-source a, .watchlist-insight small a { color: #28758d; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
     .valuation-reason { min-width: 210px; max-width: 320px; color: #46565d; font-size: 12px; line-height: 1.55; }
     .valuation-score { display: inline-flex; width: max-content; padding: 2px 7px; border-radius: 999px; background: #f0f3f2; color: #57666b; font-size: 10px; font-weight: 800; }
     .research-btn { white-space: nowrap; }
@@ -2189,6 +2190,21 @@
         "'": "&#39;"
       }[match]));
     }
+    function safeHttpUrl(value) {
+      try {
+        const url = new URL(String(value || ""), location.href);
+        return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+      } catch {
+        return "";
+      }
+    }
+    function valuationSourceHtml(signal, separator = "<br>") {
+      const referenceUrl = safeHttpUrl(signal.referenceUrl);
+      const reference = referenceUrl
+        ? `${separator}<a href="${escapeHtml(referenceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(signal.referenceLabel || "資料參考")}</a>`
+        : "";
+      return `${escapeHtml(signal.source)}${reference}${separator}${escapeHtml(signal.asOf)}`;
+    }
     function sum(rows, fn) { return rows.reduce((t, r) => t + fn(r), 0); }
     function normalizeCurrency(value) { return String(value || "TWD").trim().toUpperCase(); }
     function fxRate(currency) { return Number(data.fxRates?.[normalizeCurrency(currency)] ?? 1) || 1; }
@@ -2392,6 +2408,8 @@
         confidence,
         reasons: uniqueReasons(reasons).length ? uniqueReasons(reasons) : ["尚未設定長期持有理由"],
         source: valuation.source || "尚未取得資料來源",
+        referenceUrl: valuation.referenceUrl || "",
+        referenceLabel: valuation.referenceLabel || "",
         asOf: valuation.asOf || "待更新"
       };
     }
@@ -3411,7 +3429,7 @@
             const rowGain = rowValue - rowCost;
             const signal = valuationSignal(r);
             const metricClass = signal.metric.includes("待補") ? "watch-pending-metric" : "";
-            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><span class="valuation-type ${signal.type}">${signal.typeLabel}</span></td><td class="${metricClass}">${signal.metric}</td><td><div class="valuation-action ${signal.tone}"><strong>${signal.action}</strong><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div></td><td><div class="valuation-reason">${signal.reasons.map(escapeHtml).join("<br>")}</div></td><td><div class="valuation-source">${escapeHtml(signal.source)}<br>${escapeHtml(signal.asOf)}</div></td><td><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey(r))}">設定</button></td></tr>`;
+            return `<tr><td>${escapeHtml(r.code)}</td><td>${escapeHtml(r.name)}</td><td>${money(r.shares, "")}</td><td>${moneyFixed(r.cost, currency, 2)}</td><td>${moneyFixed(r.price, currency, 2)}</td><td>${money(rowValue, currency)}</td><td class="${rowGain >= 0 ? "gain" : ""}">${money(rowGain, currency)}</td><td>${rowCost ? (rowGain / rowCost * 100).toFixed(2) : "0.00"}%</td><td><span class="valuation-type ${signal.type}">${signal.typeLabel}</span></td><td class="${metricClass}">${signal.metric}</td><td><div class="valuation-action ${signal.tone}"><strong>${signal.action}</strong><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div></td><td><div class="valuation-reason">${signal.reasons.map(escapeHtml).join("<br>")}</div></td><td><div class="valuation-source">${valuationSourceHtml(signal)}</div></td><td><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey(r))}">設定</button></td></tr>`;
           }).join("")}</tbody>
         </table></div></article>
       `;
@@ -3547,7 +3565,7 @@
         const signal = valuationSignal({ ...row, market });
         const metricClass = signal.metric.includes("待補") ? "watch-pending-metric" : "";
         const actionClass = signal.tone || "";
-        return `<div class="watchlist-row"><div class="watchlist-fields"><label>股票代號</label>${textInput(row.code || "", `${key}.${index}.code`)}<label>股票名稱</label>${textInput(row.name || "", `${key}.${index}.name`)}<label>觀察理由</label>${textInput(row.note || "", `${key}.${index}.note`)}</div><div class="watchlist-metrics"><span><small>最新股價</small><strong class="watch-price">${moneyFixed(row.price || 0, currency, 2)}</strong></span><span><small>本益比／折溢價</small><strong class="${metricClass}">${signal.metric}</strong></span><span><small>長期持有／買進評估</small><strong class="${actionClass}">${signal.action}</strong></span><button class="icon-btn" data-del="${key}.${index}">刪</button></div><div class="watchlist-insight"><div class="watchlist-insight-head"><span class="valuation-type ${signal.type}">${signal.typeLabel}</span><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div><strong>${signal.reasons.map(escapeHtml).join("、")}</strong><small>${escapeHtml(signal.source)}｜${escapeHtml(signal.asOf)}</small><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey({ ...row, market }))}">補充研究資料</button></div></div>`;
+        return `<div class="watchlist-row"><div class="watchlist-fields"><label>股票代號</label>${textInput(row.code || "", `${key}.${index}.code`)}<label>股票名稱</label>${textInput(row.name || "", `${key}.${index}.name`)}<label>觀察理由</label>${textInput(row.note || "", `${key}.${index}.note`)}</div><div class="watchlist-metrics"><span><small>最新股價</small><strong class="watch-price">${moneyFixed(row.price || 0, currency, 2)}</strong></span><span><small>本益比／折溢價</small><strong class="${metricClass}">${signal.metric}</strong></span><span><small>長期持有／買進評估</small><strong class="${actionClass}">${signal.action}</strong></span><button class="icon-btn" data-del="${key}.${index}">刪</button></div><div class="watchlist-insight"><div class="watchlist-insight-head"><span class="valuation-type ${signal.type}">${signal.typeLabel}</span><span class="valuation-score">評分 ${signal.score}｜信心 ${signal.confidence}</span></div><strong>${signal.reasons.map(escapeHtml).join("、")}</strong><small>${valuationSourceHtml(signal, "｜")}</small><button class="btn purple small research-btn" type="button" data-research-key="${escapeHtml(valuationKey({ ...row, market }))}">補充研究資料</button></div></div>`;
       }).join("") || `<div class="muted">尚未加入觀察標的</div>`}</div></article>`;
     }
     function renderWatchlist() {

@@ -22,6 +22,9 @@ INVEST_RATES_OUTPUT_FILE = ROOT / "invest" / "latest-rates.json"
 VALUATIONS_OUTPUT_FILE = ROOT / "latest-valuations.json"
 RATE_CURRENCIES = ("USD", "JPY", "EUR", "CNY", "HKD", "THB", "KRW", "GBP", "AUD", "CAD", "SGD")
 SEC_USER_AGENT = "PersonalAssetDashboard/2.0 contact=dashboard-maintainer@example.com"
+WANTGOO_ETF_PAGE_URL = "https://www.wantgoo.com/stock/etf/net-value"
+WANTGOO_ETF_DATA_URL = "https://www.wantgoo.com/stock/etf/daily-value-data"
+SITCA_DAILY_NAV_URL = "https://www.sitca.org.tw/MemberK0000/F/03/nav.csv"
 
 
 def now_iso() -> str:
@@ -94,9 +97,18 @@ def normalize_data_date(value: object) -> str:
     text = "".join(character for character in str(value or "") if character.isdigit())
     if len(text) == 7:
         return f"{int(text[:3]) + 1911:04d}-{text[3:5]}-{text[5:7]}"
-    if len(text) == 8:
+    if len(text) >= 8:
         return f"{text[:4]}-{text[4:6]}-{text[6:8]}"
     return str(value or "").strip()
+
+
+def date_data_status(value: object) -> str:
+    normalized = normalize_data_date(value)
+    try:
+        age_days = (datetime.now(timezone.utc).date() - datetime.fromisoformat(normalized).date()).days
+    except ValueError:
+        return "partial"
+    return "current" if age_days <= 5 else "stale"
 
 
 def twse_stock_info(symbol: str, exchange: str) -> dict:
@@ -445,6 +457,125 @@ def sec_stock_valuation(code: str, cik: str, price: float | None) -> dict:
     return metrics
 
 
+def wantgoo_etf_valuations() -> tuple[dict[str, dict], str]:
+    payload = fetch_json(
+        WANTGOO_ETF_DATA_URL,
+        headers={
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": WANTGOO_ETF_PAGE_URL,
+            "X-Requested-With": "XMLHttpRequest",
+        },
+        timeout=25,
+    )
+    rows = payload if isinstance(payload, list) else []
+    values: dict[str, dict] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        code = normalize_code(row.get("stockNo"))
+        nav = parse_market_number(row.get("bookValue"))
+        market_price = parse_market_number(row.get("deal"))
+        if not code or nav is None or nav <= 0:
+            continue
+        premium = (market_price / nav - 1) * 100 if market_price is not None else None
+        as_of = normalize_data_date(row.get("date"))
+        status = date_data_status(as_of)
+        values[code] = {
+            "assetType": "etf",
+            "metric": "premium" if premium is not None else None,
+            "value": round(premium, 4) if premium is not None else None,
+            "nav": round(nav, 4),
+            "premium": round(premium, 4) if premium is not None else None,
+            "navMarketPrice": round(market_price, 4) if market_price is not None else None,
+            "source": "WantGoo ETF 淨值及折溢價",
+            "referenceUrl": WANTGOO_ETF_PAGE_URL,
+            "referenceLabel": "WantGoo 折溢價",
+            "asOf": as_of,
+            "dataStatus": status,
+            "stale": status == "stale",
+        }
+    if not values:
+        raise RuntimeError("WantGoo returned no usable ETF NAV rows")
+    return values, "WantGoo ETF 淨值及折溢價"
+
+
+def sitca_etf_valuations() -> tuple[dict[str, dict], str]:
+    req = urllib.request.Request(
+        SITCA_DAILY_NAV_URL,
+        headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/csv,text/plain,*/*",
+            "Referer": "https://www.sitca.org.tw/",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=40) as response:
+        text = decode_response_bytes(response.read())
+
+    values: dict[str, dict] = {}
+    for row in csv.reader(io.StringIO(text)):
+        if len(row) < 12:
+            continue
+        as_of = normalize_data_date(row[0])
+        code = normalize_code(row[11])
+        nav = parse_market_number(row[6])
+        currency = normalize_code(row[10])
+        if not code or nav is None or nav <= 0 or currency != "TWD":
+            continue
+        existing = values.get(code)
+        if existing and str(existing.get("asOf") or "") > as_of:
+            continue
+        status = date_data_status(as_of)
+        values[code] = {
+            "assetType": "etf",
+            "metric": None,
+            "value": None,
+            "nav": round(nav, 4),
+            "source": "投信投顧公會每日淨值",
+            "referenceUrl": WANTGOO_ETF_PAGE_URL,
+            "referenceLabel": "WantGoo 折溢價",
+            "asOf": as_of,
+            "dataStatus": status,
+            "stale": status == "stale",
+        }
+    if not values:
+        raise RuntimeError("SITCA returned no usable TWD fund NAV rows")
+    return values, "SITCA daily NAV open data"
+
+
+def tw_etf_valuations() -> tuple[dict[str, dict], list[dict[str, str]], list[dict[str, str]]]:
+    source_results: dict[str, dict[str, dict]] = {}
+    references: list[dict[str, str]] = []
+    errors: list[dict[str, str]] = []
+    for source_name, url, fetcher, optional in (
+        ("WantGoo ETF 淨值及折溢價", WANTGOO_ETF_PAGE_URL, wantgoo_etf_valuations, True),
+        ("投信投顧公會每日淨值", SITCA_DAILY_NAV_URL, sitca_etf_valuations, False),
+    ):
+        try:
+            values, _ = fetcher()
+            source_results[source_name] = values
+            references.append({"name": source_name, "url": url, "status": "available"})
+            print(f"OK ETF NAV from {source_name} -> {len(values)} rows")
+        except Exception as exc:  # noqa: BLE001 - the other source remains usable.
+            references.append({"name": source_name, "url": url, "status": "unavailable", "error": str(exc)})
+            if not optional:
+                errors.append({"source": source_name, "error": str(exc)})
+            print(f"FAIL ETF NAV from {source_name} - {exc}", file=sys.stderr)
+
+    wantgoo = source_results.get("WantGoo ETF 淨值及折溢價") or {}
+    sitca = source_results.get("投信投顧公會每日淨值") or {}
+    combined: dict[str, dict] = {}
+    for code in set(sitca) | set(wantgoo):
+        if code in wantgoo:
+            combined[code] = {**wantgoo[code]}
+            if code in sitca:
+                combined[code]["source"] = "WantGoo ETF 淨值及折溢價；投信投顧公會交叉查核"
+                combined[code]["crossCheckNav"] = sitca[code].get("nav")
+                combined[code]["crossCheckAsOf"] = sitca[code].get("asOf")
+        else:
+            combined[code] = {**sitca[code]}
+    return combined, references, errors
+
+
 def load_previous_valuations() -> dict[str, dict]:
     try:
         payload = json.loads(VALUATIONS_OUTPUT_FILE.read_text(encoding="utf-8-sig"))
@@ -470,20 +601,30 @@ def update_valuations(symbols: dict[str, list[dict[str, str]]], prices: dict[str
     for values, _ in tw_sources:
         combined_tw.update(values)
 
+    etf_values, reference_sources, etf_errors = tw_etf_valuations()
+    errors.extend(etf_errors)
+
     for row in symbols.get("tw", []):
         code = normalize_code(row.get("code"))
         if not code:
             continue
         key = f"TW:{code}"
         if is_tw_etf(code, str(row.get("name") or "")):
-            valuations[key] = {
-                "assetType": "etf",
-                "metric": None,
-                "value": None,
-                "source": "TWSE/TPEx classification; NAV or premium requires fund data",
-                "asOf": datetime.now(timezone.utc).date().isoformat(),
-                "dataStatus": "manual-needed",
-            }
+            if code in etf_values:
+                valuations[key] = etf_values[code]
+            elif key in previous and parse_market_number(previous[key].get("nav")):
+                valuations[key] = {**previous[key], "dataStatus": "stale", "stale": True}
+            else:
+                valuations[key] = {
+                    "assetType": "etf",
+                    "metric": None,
+                    "value": None,
+                    "source": "ETF classification; NAV source unavailable",
+                    "referenceUrl": WANTGOO_ETF_PAGE_URL,
+                    "referenceLabel": "WantGoo 折溢價",
+                    "asOf": "",
+                    "dataStatus": "manual-needed",
+                }
         elif code in combined_tw:
             valuations[key] = combined_tw[code]
         elif key in previous:
@@ -550,9 +691,10 @@ def update_valuations(symbols: dict[str, list[dict[str, str]]], prices: dict[str
             }
 
     output = {
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "generatedAt": now_iso(),
-        "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR; ETF NAV/fees can be supplemented in the dashboard",
+        "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA ETF NAV",
+        "referenceSources": reference_sources,
         "valuations": valuations,
         "errors": errors,
     }
