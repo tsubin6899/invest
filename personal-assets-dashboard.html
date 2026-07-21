@@ -3777,13 +3777,14 @@
     }
     function renderPnlCalendar() {
       const rows = [...data.pnlCalendar].sort((a, b) => a.date.localeCompare(b.date));
-      const tableRows = [...rows].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
       const latest = rows.at(-1) || { totalGain: 0 };
       const previous = rows.at(-2) || { totalGain: latest.totalGain };
       const delta = latest.totalGain - previous.totalGain;
       const month = calendarMonth || (latest.date || localDateString()).slice(0, 7);
       calendarMonth = month;
-      const byDate = Object.fromEntries(rows.filter(r => r.date.startsWith(month)).map(r => [r.date, r]));
+      const monthRows = rows.filter(r => String(r.date || "").startsWith(month));
+      const tableRows = [...monthRows].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")));
+      const byDate = Object.fromEntries(monthRows.map(r => [r.date, r]));
       const first = new Date(`${month}-01T00:00:00`);
       const lastDate = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
       const blanks = first.getDay();
@@ -3804,14 +3805,14 @@
           ${card("美股未實現損益", money(latest.usGain || 0), "TWD")}
         </div>
         <article class="panel"><div class="panel-pad"><h3>${month} 每日快照</h3><div class="calendar-grid">${cells.join("")}</div></div></article>
-        <article class="panel"><div class="table-wrap"><table>
+        <article class="panel"><div class="panel-pad"><h3>${month} 快照紀錄</h3><p class="section-note">明細會隨上方月份切換，其他月份的歷史資料仍會保留。</p></div><div class="table-wrap"><table>
           <thead><tr><th>日期</th><th>台股未實現損益</th><th>美股未實現損益</th><th>總未實現損益</th><th>與前次差異</th><th>備註</th><th>操作</th></tr></thead>
-          <tbody>${tableRows.map((r) => {
+          <tbody>${tableRows.length ? tableRows.map((r) => {
             const i = data.pnlCalendar.indexOf(r);
             const prev = rows.filter(item => item.date < r.date).at(-1);
             const rowDelta = prev ? r.totalGain - prev.totalGain : 0;
             return `<tr><td>${textInput(r.date, `pnlCalendar.${i}.date`)}</td><td>${textInput(r.twGain, `pnlCalendar.${i}.twGain`, "number")}</td><td>${textInput(r.usGain, `pnlCalendar.${i}.usGain`, "number")}</td><td>${textInput(r.totalGain, `pnlCalendar.${i}.totalGain`, "number")}</td><td class="${rowDelta >= 0 ? "ok" : "gain"}">${rowDelta >= 0 ? "+" : ""}${money(rowDelta)}</td><td>${textInput(r.note, `pnlCalendar.${i}.note`)}</td><td><button class="icon-btn" data-del="pnlCalendar.${i}">刪</button></td></tr>`;
-          }).join("")}</tbody>
+          }).join("") : `<tr><td colspan="7" class="muted">這個月份尚無快照紀錄。</td></tr>`}</tbody>
         </table></div></article>`;
     }
     function renderBookkeepingOverview() {
