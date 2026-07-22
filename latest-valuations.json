@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "generatedAt": "2026-07-22T05:55:36+00:00",
+  "generatedAt": "2026-07-22T07:55:42+00:00",
   "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA Taiwan ETF NAV + CMoney US ETF premium",
   "referenceSources": [
     {
@@ -508,7 +508,7 @@
       "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-22",
       "asOfBasis": "fetch-date",
-      "fetchedAt": "2026-07-22T05:55:30+00:00",
+      "fetchedAt": "2026-07-22T07:55:37+00:00",
       "dataStatus": "current",
       "stale": false
     },
@@ -522,7 +522,7 @@
       "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-22",
       "asOfBasis": "fetch-date",
-      "fetchedAt": "2026-07-22T05:55:28+00:00",
+      "fetchedAt": "2026-07-22T07:55:33+00:00",
       "dataStatus": "current",
       "stale": false
     },
