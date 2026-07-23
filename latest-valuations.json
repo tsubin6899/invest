@@ -1,6 +1,6 @@
 {
   "schemaVersion": 4,
-  "generatedAt": "2026-07-23T05:55:43+00:00",
+  "generatedAt": "2026-07-23T05:58:03+00:00",
   "source": "TWSE OpenAPI + TPEx OpenAPI + SEC EDGAR + WantGoo/SITCA Taiwan ETF NAV + CMoney US ETF premium",
   "referenceSources": [
     {
@@ -42,14 +42,13 @@
     "TW:2330": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 32.4,
-      "pe": 32.4,
-      "pb": 10.61,
-      "dividendYield": 0.91,
+      "value": 32.27,
+      "pe": 32.27,
+      "pb": 10.56,
+      "dividendYield": 0.92,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:00981A": {
       "assetType": "etf",
@@ -102,194 +101,178 @@
     "TW:2317": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 17.47,
-      "pe": 17.47,
-      "pb": 1.94,
-      "dividendYield": 2.91,
+      "value": 17.86,
+      "pe": 17.86,
+      "pb": 1.98,
+      "dividendYield": 2.85,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2454": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 58.49,
-      "pe": 58.49,
-      "pb": 15.01,
-      "dividendYield": 1.46,
+      "value": 61.35,
+      "pe": 61.35,
+      "pb": 15.75,
+      "dividendYield": 1.39,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2382": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 16.29,
-      "pe": 16.29,
-      "pb": 6.02,
-      "dividendYield": 4.81,
+      "value": 16.54,
+      "pe": 16.54,
+      "pb": 6.11,
+      "dividendYield": 4.74,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2344": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 46.14,
-      "pe": 46.14,
-      "pb": 6.0,
-      "dividendYield": 0.32,
+      "value": 50.74,
+      "pe": 50.74,
+      "pb": 6.6,
+      "dividendYield": 0.29,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2408": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 36.26,
-      "pe": 36.26,
-      "pb": 6.51,
-      "dividendYield": 0.33,
+      "value": 39.88,
+      "pe": 39.88,
+      "pb": 7.16,
+      "dividendYield": 0.3,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2337": {
       "assetType": "stock",
       "metric": null,
       "value": null,
       "pe": null,
-      "pb": 4.81,
+      "pb": 5.28,
       "dividendYield": null,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "partial"
     },
     "TW:3376": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 278.68,
-      "pe": 278.68,
-      "pb": 2.13,
-      "dividendYield": 2.11,
+      "value": 281.62,
+      "pe": 281.62,
+      "pb": 2.15,
+      "dividendYield": 2.09,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2303": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 33.79,
-      "pe": 33.79,
-      "pb": 4.16,
-      "dividendYield": 1.94,
+      "value": 34.92,
+      "pe": 34.92,
+      "pb": 4.3,
+      "dividendYield": 1.88,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:3231": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 14.99,
-      "pe": 14.99,
-      "pb": 2.5,
-      "dividendYield": 3.68,
+      "value": 16.45,
+      "pe": 16.45,
+      "pb": 2.74,
+      "dividendYield": 3.35,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2308": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 67.66,
-      "pe": 67.66,
-      "pb": 15.91,
-      "dividendYield": 0.63,
+      "value": 69.32,
+      "pe": 69.32,
+      "pb": 16.3,
+      "dividendYield": 0.62,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2327": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 52.76,
-      "pe": 52.76,
-      "pb": 8.26,
-      "dividendYield": 0.9,
+      "value": 55.35,
+      "pe": 55.35,
+      "pb": 8.66,
+      "dividendYield": 0.85,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:3013": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 19.12,
-      "pe": 19.12,
-      "pb": 3.25,
-      "dividendYield": 0.92,
+      "value": 19.67,
+      "pe": 19.67,
+      "pb": 3.34,
+      "dividendYield": 0.89,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:3037": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 121.32,
-      "pe": 121.32,
-      "pb": 11.56,
-      "dividendYield": 0.24,
+      "value": 133.38,
+      "pe": 133.38,
+      "pb": 12.7,
+      "dividendYield": 0.22,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:1802": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 416.15,
-      "pe": 416.15,
-      "pb": 3.17,
+      "value": 427.69,
+      "pe": 427.69,
+      "pb": 3.26,
       "dividendYield": null,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:4958": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 71.79,
-      "pe": 71.79,
-      "pb": 4.33,
-      "dividendYield": 0.67,
+      "value": 78.84,
+      "pe": 78.84,
+      "pb": 4.76,
+      "dividendYield": 0.61,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "TW:2603": {
       "assetType": "stock",
       "metric": "pe",
-      "value": 8.87,
-      "pe": 8.87,
-      "pb": 0.76,
-      "dividendYield": 7.88,
+      "value": 9.0,
+      "pe": 9.0,
+      "pb": 0.77,
+      "dividendYield": 7.77,
       "source": "TWSE OpenAPI BWIBBU_ALL",
-      "asOf": "2026-07-21",
-      "dataStatus": "stale",
-      "stale": true
+      "asOf": "2026-07-22",
+      "dataStatus": "current"
     },
     "US:AMAT": {
       "assetType": "stock",
@@ -526,7 +509,7 @@
       "referenceLabel": "CMoney ETF 資料",
       "asOf": "2026-07-23",
       "asOfBasis": "fetch-date",
-      "fetchedAt": "2026-07-23T05:55:37+00:00",
+      "fetchedAt": "2026-07-23T05:57:57+00:00",
       "dataStatus": "current",
       "stale": false
     },
@@ -560,10 +543,5 @@
       "dataStatus": "manual-needed"
     }
   },
-  "errors": [
-    {
-      "source": "TWSE OpenAPI",
-      "error": "Expecting value: line 1 column 1 (char 0)"
-    }
-  ]
+  "errors": []
 }
